@@ -13,9 +13,9 @@ The plugin is tested to work with WAS version 8.5
 
 ##Installation
 
-1. Copy the perfservmon.py file in $USER1$ path, which is the plugins path. You will propably find the value of this variable in Nagios resource.cfg file.
+1. Copy the `perfservmon.py` file in `$USER1$` path, which is the plugins path. You will propably find the value of this variable in Nagios `resource.cfg` file.
 
-2. Add the following lines in Nagios command.cfg file:
+2. Add the following lines in Nagios `command.cfg` file:
 
 ```
 #Check_perfservlet commands
