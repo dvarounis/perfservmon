@@ -3,6 +3,15 @@
 *Perfservmon* is  a *Nagios Plugin* for *IBM Websphere Application Server(WAS)* using the perfservlet web application that comes with each WAS 
 installation.
 
+The plugin can monitor the following WAS metrics of a WebSphere Cell:
+
+- Heap Usage
+- Web Container Thread Pool Usage
+- ORB Thread Pool Usage
+- JDBC Connection Pool Usage
+- Live HTTP Sessions
+- JMS SIB Destination(Queue, Topic) Metrics
+
 ##Prerequisites
 
 1. Install in one WAS server of your WebSphere Cell the PerfServletApp.ear located in `<WAS_ROOT>/installableApps`, i.e. in `/opt/IBM/WebSphere/AppServer/installableApps` in a Unix System.
