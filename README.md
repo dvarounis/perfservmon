@@ -14,7 +14,7 @@ The plugin can monitor the following WAS metrics of a WebSphere Cell:
 
 ##Prerequisites
 
-1. Install in one WAS server of your WebSphere Cell the PerfServletApp.ear located in `<WAS_ROOT>/installableApps`, i.e. in `/opt/IBM/WebSphere/AppServer/installableApps` in a Unix System.
+1. Install in one WAS server of your WebSphere Cell the PerfServletApp.ear located in `<WAS_ROOT>/installableApps`, i.e. this would be in `/opt/IBM/WebSphere/AppServer/installableApps` in a Unix System.
 
 2. At least Python version 2.7 at the Nagios host
 
@@ -48,7 +48,7 @@ define command{
 ##Usage
 
 #### Define Collector Service 
-First add the following service definition at the WAS Server or the DMgr Server(for ND Architecture) Nagios Config file:
+Before defining a service using check_perfserv_show it is required to add the following service definition at the WAS Server or the DMgr Server(for ND Architecture) Nagios Config file:
 
 ```
 define service{
@@ -62,6 +62,32 @@ define service{
  * WAS_Cell_Name = The name of the Websphere Cell
  * PerfServ_hostname = The IP Address/Hostname of where perfservlet Application runs
  * PerfServ_Port = The Port of where perfservlet Application runs
+ 
+ This is the check that collects all the relevant perfserv data of all nodes/servers from perfservlet and stores them localy as a Python selve file.
+ 
+ In case you want to change the check interval of the above service so that all WAS data are refreshed more frequently you may add the following lines in Nagios template.cfg:
+  
+``` 
+define service{
+        name                            collector-service           ; The name of this service template
+        use                             local-service         ; Inherit default values from the local-service definition
+        max_check_attempts              2                       ; Re-check the service up to 2 times in order to determine its final (hard) state
+        normal_check_interval           3                       ; Check the service every 3 minutes under normal conditions
+        retry_check_interval            1                       ; Re-check the service every minute until a hard state can be determined
+        register                        0                       ; DONT REGISTER THIS DEFINITION - ITS NOT A REAL SERVICE, JUST A TEMPLATE!
+        }
+ ```
+
+Then the collector service definition will be like the following:
+
+```
+define service{
+        use                             collector-service        
+        host_name                       <WAS_Host>
+        service_description             Collect PerfServlet data from Cell
+        check_command                   check_perfserv_retriever!<WAS_Cell_Name>!<PerfServ_hostname>!<PerfServ_Port>
+        }
+ ```
  
 #### Sample Service Definitions for WAS Metrics
 
