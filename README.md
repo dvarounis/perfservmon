@@ -65,7 +65,7 @@ define service{
  
  This is the check that collects all the relevant perfserv data of all nodes/servers from perfservlet and stores them localy as a Python selve file.
  
- In case you want to change the check interval of the above service so that all WAS data are refreshed more frequently you may add the following lines in Nagios template.cfg:
+ In case you want, for example, to change the check interval of the above service so that all WAS data are refreshed more frequently you may add the following lines in Nagios template.cfg:
   
 ``` 
 define service{
@@ -78,7 +78,7 @@ define service{
         }
  ```
 
-Then the collector service definition will be like the following:
+Then the collector service definition should be like the following:
 
 ```
 define service{
@@ -113,7 +113,9 @@ define service{
         }
 ```
 
-* JDBC Connection Pool
+* JDBC Connection Pools
+
+Shows all the available connection pools of the WAS Server and show an alert when any of them exceeds the percentage limits.
 
 ```
 define service{
@@ -124,3 +126,26 @@ define service{
         }
 ```
 
+* Total Live HTTP Sessions
+
+Shows the Total Live HTTP Sessions together with the individual(per Module HTTP Sessions). Show an alert when the Total Sessions exceed the limits.  
+
+```
+define service{
+        use                             local-service
+        host_name                       <WAS_Host>
+        service_description             WAS Http Live Sessions
+        check_command                   check_perfserv_show!<WAS_Cell_Name>!<WAS_Node_Name>!<WAS_server_name>!LiveSessions!<Critical No of Sessions>!<Warning No of Sessions>
+        }
+```
+
+* ORB Thread Pool Usage
+
+```
+define service{
+        use                             local-service
+        host_name                       <WAS_Host>
+        service_description             WAS ORB ThreadPool Usage
+        check_command                   check_perfserv_show!<WAS_Cell_Name>!<WAS_Node_Name>!<WAS_server_name>!ORB!<Critical Percentage>!<Warning Percentage>
+        }
+```
