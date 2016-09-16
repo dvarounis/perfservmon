@@ -14,18 +14,16 @@ The plugin can monitor the following WAS metrics of a WebSphere Cell:
 
 ##Prerequisites
 
-1. Perfservlet App
-
-Install the PerfServletApp.ear in one WAS server of your WebSphere Cell.
-This is located in `<WAS_ROOT>/installableApps`, i.e. this would be in `/opt/IBM/WebSphere/AppServer/installableApps` in a Unix System.
-
-2. Python version greater than 2.7 installed at the Nagios host
+1. **Perfservlet App**
+    Install the PerfServletApp.ear in one WAS server of your WebSphere Cell.
+    This is located in `<WAS_ROOT>/installableApps`, i.e. this would be in `/opt/IBM/WebSphere/AppServer/installableApps` in a Unix System.
+2. **Python version greater than 2.7** installed at the Nagios host
 
 The plugin is tested to work with WAS version 8.5.
 
 ##Setup
 
-1. Copy the `perfservmon.py` file in `$USER1$` path, which is the plugins path. You will propably find the value of this variable in Nagios `resource.cfg` file.
+1. Copy the `perfservmon.py` file in `$USER1$` path, which is the plugins path. You will propably find the value of this variable in Nagios `resource.cfg` file (usually this is a `libexec` directory).
 
 2. Add the following lines in Nagios `command.cfg` file:
 
