@@ -14,13 +14,16 @@ The plugin can monitor the following WAS metrics of a WebSphere Cell:
 
 ##Prerequisites
 
-1. Install in one WAS server of your WebSphere Cell the PerfServletApp.ear located in `<WAS_ROOT>/installableApps`, i.e. this would be in `/opt/IBM/WebSphere/AppServer/installableApps` in a Unix System.
+1. Perfservlet App
 
-2. At least Python version 2.7 at the Nagios host
+Install the PerfServletApp.ear in one WAS server of your WebSphere Cell.
+This is located in `<WAS_ROOT>/installableApps`, i.e. this would be in `/opt/IBM/WebSphere/AppServer/installableApps` in a Unix System.
+
+2. Python version greater than 2.7 installed at the Nagios host
 
 The plugin is tested to work with WAS version 8.5.
 
-##Installation
+##Setup
 
 1. Copy the `perfservmon.py` file in `$USER1$` path, which is the plugins path. You will propably find the value of this variable in Nagios `resource.cfg` file.
 
@@ -147,5 +150,23 @@ define service{
         host_name                       <WAS_Host>
         service_description             WAS ORB ThreadPool Usage
         check_command                   check_perfserv_show!<WAS_Cell_Name>!<WAS_Node_Name>!<WAS_server_name>!ORB!<Critical Percentage>!<Warning Percentage>
+        }
+```
+
+* JMS SIB Destinations (Queue, Topic)
+
+```
+define service{
+        use                             local-service
+        host_name                       <WAS_Host>
+        service_description             My Topic Space
+        check_command                   check_perfserv_show_sib!<WAS_Cell_Name>!<WAS_Node_Name>!<WAS_server_name>!<MyTopicSpaceName>!<No_Messages_Critical>!<No_Messages_Warning>
+        }
+
+define service{
+        use                             local-service
+        host_name                       <WAS_Host>
+        service_description             My Exception Destination
+        check_command                   check_perfserv_show_sib!<WAS_Cell_Name>!<WAS_Node_Name>!<WAS_server_name>!_SYSTEM.Exception.Destination.<WAS_Node_Name>.<WAS_server_name>-<SIBus_Name>!<No_Messages_Critical>!<No_Messages_Warning>
         }
 ```
