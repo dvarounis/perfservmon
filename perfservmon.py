@@ -16,7 +16,13 @@ import time
 
 
 class GenericServer:
+    """Generic WAS Server Prototype"""
+
     def __init__(self, name, nodename):
+        """
+        :param name: WAS Server Name
+        :param nodename: WAS Node Name the Server belongs
+        """
         self.name = name
         self.nodename = nodename
         self.maxheapMB = None
@@ -29,12 +35,22 @@ class GenericServer:
         print 'HeapUsed:' + str(self.heapusedMB)
 
     def serverfullname(self):
+        """Utility to uniquely identify a server in a Cell"""
         return '.'.join((self.nodename, self.name))
 
 
 # ###################################################################################
 class SIBDestination:
+    """WAS SIB Generic Class
+    Can be a Topic Space or a Queue
+    """
+
     def __init__(self, name, totalmessagesconsumed, availablemessages):
+        """
+        :param name: The Destination Name
+        :param totalmessagesconsumed: PMI Metric -> Total Messages Consumed since restart of Message Engine
+        :param availablemessages: PMI Metric -> No of available msgs in Destination
+        """
         self.Name = name
         self.TotalMessagesConsumed = totalmessagesconsumed
         self.AvailableMessages = availablemessages
@@ -46,16 +62,26 @@ class SIBDestination:
 
 
 class SIBQueue(SIBDestination):
+    """Queue Destination"""
+
     def __init__(self, name, totalmessagesconsumed, availablemessages):
         SIBDestination.__init__(self, name, totalmessagesconsumed, availablemessages)
 
 
 class SIBTopicSpace(SIBDestination):
+    """Pub/Sub Destination"""
+
     def __init__(self, name, totalmessagesconsumed, availablemessages):
+        """
+        :param name: The Destination Name
+        :param totalmessagesconsumed: PMI Metric -> Total Messages Consumed since restart of Message Engine
+        :param availablemessages: PMI Metric -> No of available msgs in Destination
+        """
         SIBDestination.__init__(self, name, totalmessagesconsumed, availablemessages)
         self.subscribers = []
 
     def adddurablesubscriber(self, subscrname):
+        """Add Active Durable Subscribers to the list"""
         self.subscribers.append(str(subscrname))
 
     def printsibdest(self):
@@ -68,6 +94,8 @@ class SIBTopicSpace(SIBDestination):
 
 
 class TypicalApplicationServer(GenericServer):
+    """Typical WAS Class - Recommended for use in most cases"""
+
     def __init__(self, name, nodename):
         GenericServer.__init__(self, name, nodename)
         self.wcpoolsize = None
@@ -179,11 +207,10 @@ class TypicalApplicationServer(GenericServer):
             destination = self.destinations[destname]
             msg = 'Destination:%s - Available Messages:%s , Messages Consumed:%s ' % (
                 destination.Name, destination.AvailableMessages, destination.TotalMessagesConsumed)
-            if isinstance(destination, SIBTopicSpace):
-                if len(destination.subscribers) > 0:
-                    msg += ' , Durable Subscribers:'
-                    for subscriber in destination.subscribers:
-                        msg += '%s ' % subscriber
+            if isinstance(destination, SIBTopicSpace) and len(destination.subscribers) > 0:
+                msg += ' , Durable Subscribers:'
+                for subscriber in destination.subscribers:
+                    msg += '%s ' % subscriber
             if waitingmsgcountwarn < int(destination.AvailableMessages) < waitingmsgcountcrit:
                 return WARNING, msg
             elif int(destination.AvailableMessages) > waitingmsgcountcrit:
@@ -195,7 +222,8 @@ class TypicalApplicationServer(GenericServer):
 # ############################################################################################################
 def parseperfxml(path, cellname):
     """
-
+    Parse the perfsevlet xml and store the needed metrics(defined in metrics dict) for all WAS servers
+    of the Cell in a python selve file
     :param path: Where to store the perfserv xml and the python shelve file
     :param cellname: The name of the WAS Cell
     :raise:
@@ -209,7 +237,7 @@ def parseperfxml(path, cellname):
                'JDBC Connection Pools': parseconnpoolsstats,
                'Servlet Session Manager': parsesessionstats,
                'SIB Service': parsesibstats
-    }
+               }
     try:
         tree = parse(xmlfilename)
         for B in tree.iter('Node'):
@@ -219,8 +247,9 @@ def parseperfxml(path, cellname):
                 for stat in server.iter('Stat'):
                     metricname = stat.attrib['name']
                     if metricname is not None and metricname in metrics:
+                        # For each metric call the appropriate method
                         metrics[metricname](was, stat)
-                #was.printserver()
+                # was.printserver()
                 pfile[was.serverfullname()] = was
     except AttributeError:
         raise
@@ -309,7 +338,7 @@ def parsesibstats(was, stat):
 # #################################################################################################################
 def retrieveperfxml(path, cellname, ip, port):
     """
-
+    Perfservlet XML Retrieval Method
     :param path: The file path where perfserv xml and shelve output is stored
     :param cellname: The Name of the WAS Cell
     :param ip: The ip of the perfserv appication
@@ -319,14 +348,14 @@ def retrieveperfxml(path, cellname, ip, port):
     url = setperfservurl(ip, port, path, cellname)
     xmlfilename = path + cellname + '.xml'
     try:
-        perfserv = urllib2.urlopen(url, timeout=20)
+        perfserv = urllib2.urlopen(url, timeout=30)
     except urllib2.HTTPError as error:
         return CRITICAL, 'Could not open perfservlet URL - Response Status Code %s' % error.code
     except urllib2.URLError as error:
         return CRITICAL, 'Could not open perfservlet URL - %s' % error.reason
     else:
         with open(xmlfilename, 'w') as xmlfile:
-                xmlfile.writelines(perfserv.readlines())
+            xmlfile.writelines(perfserv.readlines())
         tree = parse(xmlfilename)
         root = tree.getroot()
         if root.attrib['responseStatus'] == 'failed':
@@ -338,13 +367,23 @@ def retrieveperfxml(path, cellname, ip, port):
 
 
 def touch(fullpath):
+    """
+    Used for Refreshing Perfservlet cache, determing the time for this to happen
+    Usage Similar to UNIX touch command
+    """
     with open(fullpath, 'a'):
         os.utime(fullpath, None)
 
 
 def setperfservurl(ip, port, path, cellname, refcacheinterval=3600):
-
-
+    """Construct PerfServlet URL to call from Collector
+    :param ip: IP Addr of the Server where perfservl runs
+    :param port: HTTP Port of the Server where perfservl runs
+    :param refcacheinterval: Interval to Refresh Perfservlet cache
+    :param path: Location of .lck file, used for determining the interval window for the specific Cell
+    :param cellname: The Name of the WAS Cell, used in .lck file name
+    :return: PerfServlet URL
+    """
     cachereffile = path + cellname + '.lck'
     url = 'http://' + ip + ':' + port + '/wasPerfTool/servlet/perfservlet'
     if os.path.isfile(cachereffile):
@@ -359,6 +398,7 @@ def setperfservurl(ip, port, path, cellname, refcacheinterval=3600):
 
 
 def parsecmdargs():
+    """Parse Given Plugin Attributes"""
     parser = argparse.ArgumentParser(description='Nagios plugin on Websphere Cell Metrics. Uses the PerfServlet App')
     parser.add_argument("-C", type=str, action="store", dest='CellName', help="Cell name", required=True)
     subparsers = parser.add_subparsers(help='Commands', dest='command_name')
@@ -384,6 +424,17 @@ def parsecmdargs():
 
 
 def queryperfdata(path, cellname, nodename, servername, metric, warning, critical, destination=None):
+    """Fundamental Perfservlet Data Query Method - Used by Nagios show Check
+    :param path: Where selve file lies
+    :param cellname: the WAS Cell Name
+    :param nodename: the WAS Node Name
+    :param servername: the WAS Server Name
+    :param metric: Pick one of WebContainer, ORB, DBConnectionPool, Heap, LiveSessions, SIBDestinations
+    :param warning: Warning threshold
+    :param critical: Critical threshold
+    :param destination: Destination Name. Must be defined if Metric = SIBDestinations
+    :return: Nagios Message
+    """
     shelvefilename = path + cellname + '.dbm'
     try:
         perffile = shelve.open(shelvefilename, flag='r')
@@ -405,7 +456,7 @@ def queryperfdata(path, cellname, nodename, servername, metric, warning, critica
         elif metric == 'LiveSessions':
             return appsrv.querylivesessions()
         elif metric == 'SIBDestinations':
-            if not destination is None:
+            if destination is not None:
                 return appsrv.querysibdestination(destination, warning, critical)
             else:
                 return UNKNOWN, 'Please set destination Name using -d DestName'
@@ -414,6 +465,7 @@ def queryperfdata(path, cellname, nodename, servername, metric, warning, critica
 
 
 def show(alertstatus, alertmessage):
+    """Print Nagios Msg and exit with appropriate Return Code"""
     if alertstatus == OK:
         print 'OK - %s' % alertmessage
         sys.exit(OK)
@@ -436,17 +488,20 @@ if __name__ == '__main__':
     UNKNOWN = 3
 
     startingpath = ''
+    # Assume the Plugin/Nagios Server runs in Linux OS
     if 'Linux' == platform.system():
         startingpath = '/tmp/'
 
     arguments = parsecmdargs()
     if arguments.command_name == 'retrieve':
+        # Perfservlet Data Collector Operation
         status, message = retrieveperfxml(path=startingpath, cellname=arguments.CellName, ip=arguments.IPAddress,
                                           port=arguments.Port)
         if status == OK:
             parseperfxml(path=startingpath, cellname=arguments.CellName)
         show(status, message)
     elif arguments.command_name == 'show':
+        # Nagios Check Perfservlet Data stored in Python selve file
         status, message = queryperfdata(startingpath, arguments.CellName, arguments.NodeName, arguments.ServerName,
                                         arguments.Metric, arguments.Warning, arguments.Critical,
                                         destination=arguments.Destination)
