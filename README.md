@@ -168,3 +168,6 @@ define service{
         check_command                   check_perfserv_show_sib!<WAS_Cell_Name>!<WAS_Node_Name>!<WAS_server_name>!_SYSTEM.Exception.Destination.<WAS_Node_Name>.<WAS_server_name>-<SIBus_Name>!<No_Messages_Critical>!<No_Messages_Warning>
         }
 ```
+
+
+[![Code Issues](https://www.quantifiedcode.com/api/v1/project/6029a3ce1c814915ae94f9841332b754/badge.svg)](https://www.quantifiedcode.com/app/project/6029a3ce1c814915ae94f9841332b754)
