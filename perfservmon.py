@@ -336,16 +336,20 @@ def parsesibstats(was, stat):
 
 
 # #################################################################################################################
-def retrieveperfxml(path, cellname, ip, port):
+def retrieveperfxml(path, cellname, ip, port, httpprotocol='http'):
     """
     Perfservlet XML Retrieval Method
     :param path: The file path where perfserv xml and shelve output is stored
     :param cellname: The Name of the WAS Cell
     :param ip: The ip of the perfserv appication
     :param port: The port of the perfserv appication
+    :param httpprotocol: The http protocol to access the perfservlet, can be http or https, default http
     :return: The nagios message
     """
-    url = setperfservurl(ip, port, path, cellname)
+    if httpprotocol in ['http', 'https']:
+        url = setperfservurl(ip, port, path, cellname, httpprotocol)
+    else:
+        return UNKNOWN, 'Invalid Perfserv URL'
     xmlfilename = path + cellname + '.xml'
     try:
         perfserv = urllib2.urlopen(url, timeout=30)
@@ -375,17 +379,18 @@ def touch(fullpath):
         os.utime(fullpath, None)
 
 
-def setperfservurl(ip, port, path, cellname, refcacheinterval=3600):
+def setperfservurl(ip, port, path, cellname, httpprotocol, refcacheinterval=3600):
     """Construct PerfServlet URL to call from Collector
     :param ip: IP Addr of the Server where perfservl runs
     :param port: HTTP Port of the Server where perfservl runs
-    :param refcacheinterval: Interval to Refresh Perfservlet cache
     :param path: Location of .lck file, used for determining the interval window for the specific Cell
     :param cellname: The Name of the WAS Cell, used in .lck file name
+    :param refcacheinterval: Interval to Refresh Perfservlet cache
+    :param httpprotocol: The http protocol to access the perfservlet, can be http or https
     :return: PerfServlet URL
     """
     cachereffile = path + cellname + '.lck'
-    url = 'http://' + ip + ':' + port + '/wasPerfTool/servlet/perfservlet'
+    url = httpprotocol+'://' + ip + ':' + port + '/wasPerfTool/servlet/perfservlet'
     if os.path.isfile(cachereffile):
         timeelapsed = time.time() - os.path.getmtime(cachereffile)
         if timeelapsed > refcacheinterval:
@@ -407,6 +412,8 @@ def parsecmdargs():
                                  help="IP Address of perfservlet server", required=True)
     retrieve_parser.add_argument("-P", type=str, action="store", dest='Port', help="Port of perfservlet server",
                                  required=True)
+    retrieve_parser.add_argument("-H", type=str, action="store", dest='HttpProtocol', choices=['http', 'https'],
+                                 help="Perfservlet HTTP Protocol", default='http', required=False)
     show_parser = subparsers.add_parser('show', help='Show metrics')
     show_parser.add_argument("-n", type=str, action="store", dest='NodeName', help="Node Name", required=True)
     show_parser.add_argument("-s", type=str, action="store", dest='ServerName', help="Server Name", required=True)
@@ -496,7 +503,7 @@ if __name__ == '__main__':
     if arguments.command_name == 'retrieve':
         # Perfservlet Data Collector Operation
         status, message = retrieveperfxml(path=startingpath, cellname=arguments.CellName, ip=arguments.IPAddress,
-                                          port=arguments.Port)
+                                          port=arguments.Port, httpprotocol=arguments.HttpProtocol)
         if status == OK:
             parseperfxml(path=startingpath, cellname=arguments.CellName)
         show(status, message)
