@@ -19,7 +19,7 @@ The plugin can monitor the following WAS metrics of a WebSphere Cell:
 1. **Perfservlet App**
     Install the PerfServletApp.ear in one WAS server of your WebSphere Cell.
     This is located in `<WAS_ROOT>/installableApps`, i.e. this would be in `/opt/IBM/WebSphere/AppServer/installableApps` in a Unix System.
-2. **Python version greater than 2.7** installed at the Nagios host
+2. **Python version greater than 2.7.9** installed at the Nagios host
 
 The plugin is tested to work with WAS version 8.5.
 
@@ -34,7 +34,7 @@ The plugin is tested to work with WAS version 8.5.
 
 define command{
         command_name    check_perfserv_retriever
-        command_line    $USER1$/perfservmon.py -C $ARG1$ retrieve -N $ARG2$ -P $ARG3$
+        command_line    $USER1$/perfservmon.py -C $ARG1$ retrieve -N $ARG2$ -P $ARG3$ -H $ARG4$
         }
 
 define command{
@@ -58,13 +58,15 @@ define service{
         use                             local-service        
         host_name                       <WAS_Host>
         service_description             Collect PerfServlet data from Cell
-        check_command                   check_perfserv_retriever!<WAS_Cell_Name>!<PerfServ_hostname>!<PerfServ_Port>
+        check_command                   check_perfserv_retriever!<WAS_Cell_Name>!<PerfServ_hostname>!<PerfServ_Port>![http|https]
         }
  ```
  Where:
  * WAS_Cell_Name = The name of the Websphere Cell
  * PerfServ_hostname = The IP Address/Hostname of where perfservlet Application runs
  * PerfServ_Port = The Port of where perfservlet Application runs
+ 
+ Also set the HTTP protocol for accessing the PerfServlet. This can be http or https.
  
  This is the check that collects all the relevant perfserv data of all nodes/servers from perfservlet and stores them localy as a Python selve file.
  

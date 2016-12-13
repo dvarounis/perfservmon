@@ -13,6 +13,7 @@ import datetime
 import platform
 import os
 import time
+import ssl
 
 
 class GenericServer:
@@ -352,7 +353,14 @@ def retrieveperfxml(path, cellname, ip, port, httpprotocol='http'):
         return UNKNOWN, 'Invalid Perfserv URL'
     xmlfilename = path + cellname + '.xml'
     try:
-        perfserv = urllib2.urlopen(url, timeout=30)
+        if url.startswith('https'):
+            ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+            # Default behaviour: Accept any certificate. To be reconsidered in future.
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            perfserv = urllib2.urlopen(url, context=ctx, timeout=30)
+        else:
+            perfserv = urllib2.urlopen(url, timeout=30)
     except urllib2.HTTPError as error:
         return CRITICAL, 'Could not open perfservlet URL - Response Status Code %s' % error.code
     except urllib2.URLError as error:
@@ -390,7 +398,7 @@ def setperfservurl(ip, port, path, cellname, httpprotocol, refcacheinterval=3600
     :return: PerfServlet URL
     """
     cachereffile = path + cellname + '.lck'
-    url = httpprotocol+'://' + ip + ':' + port + '/wasPerfTool/servlet/perfservlet'
+    url = httpprotocol + '://' + ip + ':' + port + '/wasPerfTool/servlet/perfservlet'
     if os.path.isfile(cachereffile):
         timeelapsed = time.time() - os.path.getmtime(cachereffile)
         if timeelapsed > refcacheinterval:
