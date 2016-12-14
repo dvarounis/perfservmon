@@ -336,7 +336,7 @@ def parsesibstats(was, stat):
 
 
 # #################################################################################################################
-def retrieveperfxml(path, cellname, ip, port, httpprotocol='http'):
+def retrieveperfxml(path, cellname, ip, port, username, password, httpprotocol='http'):
     """
     Perfservlet XML Retrieval Method
     :param path: The file path where perfserv xml and shelve output is stored
@@ -344,6 +344,8 @@ def retrieveperfxml(path, cellname, ip, port, httpprotocol='http'):
     :param ip: The ip of the perfserv appication
     :param port: The port of the perfserv appication
     :param httpprotocol: The http protocol to access the perfservlet, can be http or https, default http
+    :param username: An user which is authorized to access perfservlet
+    :param password: perfservlet authorized user password
     :return: The nagios message
     """
     if httpprotocol in ['http', 'https']:
@@ -352,6 +354,11 @@ def retrieveperfxml(path, cellname, ip, port, httpprotocol='http'):
         return UNKNOWN, 'Invalid Perfserv URL'
     xmlfilename = path + cellname + '.xml'
     try:
+        passman = urllib2.HTTPPasswordMgrWithDefaultRealm()
+        passman.add_password(None, url, username, password)
+        authhandler = urllib2.HTTPBasicAuthHandler(passman)
+        opener = urllib2.build_opener(authhandler)
+        urllib2.install_opener(opener)
         perfserv = urllib2.urlopen(url, timeout=30)
     except urllib2.HTTPError as error:
         return CRITICAL, 'Could not open perfservlet URL - Response Status Code %s' % error.code
@@ -414,6 +421,10 @@ def parsecmdargs():
                                  required=True)
     retrieve_parser.add_argument("-H", type=str, action="store", dest='HttpProtocol', choices=['http', 'https'],
                                  help="Perfservlet HTTP Protocol", default='http', required=False)
+    retrieve_parser.add_argument("-u", type=str, action="store", dest='Username',
+                                 help="Perfservlet authorized user", default='', required=False)
+    retrieve_parser.add_argument("-p", type=str, action="store", dest='Password',
+                                 help="Perfservlet user password", default='', required=False)
     show_parser = subparsers.add_parser('show', help='Show metrics')
     show_parser.add_argument("-n", type=str, action="store", dest='NodeName', help="Node Name", required=True)
     show_parser.add_argument("-s", type=str, action="store", dest='ServerName', help="Server Name", required=True)
@@ -503,7 +514,7 @@ if __name__ == '__main__':
     if arguments.command_name == 'retrieve':
         # Perfservlet Data Collector Operation
         status, message = retrieveperfxml(path=startingpath, cellname=arguments.CellName, ip=arguments.IPAddress,
-                                          port=arguments.Port, httpprotocol=arguments.HttpProtocol)
+                                          port=arguments.Port, httpprotocol=arguments.HttpProtocol, username=arguments.Username, password=arguments.Password)
         if status == OK:
             parseperfxml(path=startingpath, cellname=arguments.CellName)
         show(status, message)
