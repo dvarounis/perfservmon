@@ -19,7 +19,7 @@ The plugin can monitor the following WAS metrics of a WebSphere Cell:
 1. **Perfservlet App**
     Install the PerfServletApp.ear in one WAS server of your WebSphere Cell.
     This is located in `<WAS_ROOT>/installableApps`, i.e. this would be in `/opt/IBM/WebSphere/AppServer/installableApps` in a Unix System.
-2. **Python version greater than 2.7.9** installed at the Nagios host
+2. **Python version 2.7** installed at the Nagios host
 
 The plugin is tested to work with WAS version 8.5.
 
@@ -31,10 +31,12 @@ The plugin is tested to work with WAS version 8.5.
 
 ```
 #Check_perfservlet commands
+#The -H -u -p parameters are optional
+#depending on whether you use https and/or Basic Auth credentials to access the perfservlet
 
 define command{
         command_name    check_perfserv_retriever
-        command_line    $USER1$/perfservmon.py -C $ARG1$ retrieve -N $ARG2$ -P $ARG3$ -H $ARG4$
+        command_line    $USER1$/perfservmon.py -C $ARG1$ retrieve -N $ARG2$ -P $ARG3$ -H $ARG4$ -u $ARG5$ -p $ARG6$
         }
 
 define command{
@@ -58,7 +60,7 @@ define service{
         use                             local-service        
         host_name                       <WAS_Host>
         service_description             Collect PerfServlet data from Cell
-        check_command                   check_perfserv_retriever!<WAS_Cell_Name>!<PerfServ_hostname>!<PerfServ_Port>![http|https]
+        check_command                   check_perfserv_retriever!<WAS_Cell_Name>!<PerfServ_hostname>!<PerfServ_Port>![http|https]!userid!passwd
         }
  ```
  Where:
@@ -66,7 +68,7 @@ define service{
  * PerfServ_hostname = The IP Address/Hostname of where perfservlet Application runs
  * PerfServ_Port = The Port of where perfservlet Application runs
  
- Also set the HTTP protocol for accessing the PerfServlet. This can be http or https.
+ Optionally set the HTTP protocol(http or https) and/or the Basic Authentication credentials for accessing the PerfServlet Application.
  
  This is the check that collects all the relevant perfserv data of all nodes/servers from perfservlet and stores them localy as a Python selve file.
  
@@ -90,7 +92,7 @@ define service{
         use                             collector-service        
         host_name                       <WAS_Host>
         service_description             Collect PerfServlet data from Cell
-        check_command                   check_perfserv_retriever!<WAS_Cell_Name>!<PerfServ_hostname>!<PerfServ_Port>
+        check_command                   check_perfserv_retriever!<WAS_Cell_Name>!<PerfServ_hostname>!<PerfServ_Port>![http|https]!userid!passwd
         }
  ```
  
