@@ -1,6 +1,7 @@
 #!/usr/bin/python
 """
 @author: varounisdi
+@author: atterdag
 """
 
 import argparse
@@ -13,6 +14,8 @@ import datetime
 import platform
 import os
 import time
+import base64
+import ssl
 
 
 class GenericServer:
@@ -108,6 +111,7 @@ class TypicalApplicationServer(GenericServer):
         self.activesessions = {}
         self.livesessions = {}
         self.destinations = {}
+        self.jndinames = {}
 
     def printserver(self):
         print '****************************'
@@ -163,13 +167,19 @@ class TypicalApplicationServer(GenericServer):
             else:
                 return OK, msg
 
-    def querydbconnpool(self, warning=75, critical=90):
-        if len(self.connpools) == 0:
+    def querydbconnpool(self, jndiname, warning=75, critical=90):
+        if len(self.connpools) == 0 or self.connpools is None:
             return UNKNOWN, 'Could not find DB Connection Pool metrics for server %s' % self.name
         else:
-            msg = 'DB Connection Pool Usage'
-            statuscode = OK
+            connpoolExist = "false"
+            statuscode = "UNKNOWN"
+            msg = "no DB Connection Pool for " + jndiname + " was found"
             for connpool in self.connpools:
+                if connpool == jndiname:
+                    connpoolExist = "true"
+            if connpoolExist == "true":
+                msg = 'DB Connection Pool Usage'
+                statuscode = OK
                 percentused = int(self.connpools[connpool])
                 msg += ' - %s %s%%' % (connpool, percentused)
                 if warning < percentused < critical and statuscode == OK:
@@ -281,11 +291,10 @@ def parseorbtpstats(was, stat):
 
 def parseconnpoolsstats(was, stat):
     for connprovider in stat.findall('./Stat'):
-        if connprovider.attrib['name'].startswith('DB2'):
-            for connpool in connprovider.findall('./Stat'):
-                connpoolpercent = connpool.find(".//RangeStatistic[@name='PercentUsed']")
-                if connpoolpercent is not None:
-                    was.addjdbcconnpool(connpool.attrib['name'], connpoolpercent.attrib['value'])
+        for connpool in connprovider.findall('./Stat'):
+            connpoolpercent = connpool.find(".//RangeStatistic[@name='PercentUsed']")
+            if connpoolpercent is not None:
+                was.addjdbcconnpool(connpool.attrib['name'], connpoolpercent.attrib['value'])
 
 
 def parsesessionstats(was, stat):
@@ -354,12 +363,21 @@ def retrieveperfxml(path, cellname, ip, port, username, password, httpprotocol='
         return UNKNOWN, 'Invalid Perfserv URL'
     xmlfilename = path + cellname + '.xml'
     try:
-        passman = urllib2.HTTPPasswordMgrWithDefaultRealm()
-        passman.add_password(None, url, username, password)
-        authhandler = urllib2.HTTPBasicAuthHandler(passman)
-        opener = urllib2.build_opener(authhandler)
-        urllib2.install_opener(opener)
-        perfserv = urllib2.urlopen(url, timeout=30)
+        req = urllib2.Request(url)
+        # if Basic Auth is enabled
+        if username and password:
+            auth_encoded = base64.encodestring('%s:%s' % (username, password))[:-1]
+            req.add_header('Authorization', 'Basic %s' % auth_encoded)
+
+        # Add SSLContext check for Python older than 2.7.9
+        if httpprotocol == 'https' and hasattr(ssl, 'SSLContext'):
+            ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+            ctx.check_hostname = False
+            # Default Behaviour: Accept any certificate
+            ctx.verify_mode = ssl.CERT_NONE
+            perfserv = urllib2.urlopen(req, context=ctx, timeout=30)
+        else:
+            perfserv = urllib2.urlopen(req, timeout=30)
     except urllib2.HTTPError as error:
         return CRITICAL, 'Could not open perfservlet URL - Response Status Code %s' % error.code
     except urllib2.URLError as error:
@@ -397,7 +415,7 @@ def setperfservurl(ip, port, path, cellname, httpprotocol, refcacheinterval=3600
     :return: PerfServlet URL
     """
     cachereffile = path + cellname + '.lck'
-    url = httpprotocol+'://' + ip + ':' + port + '/wasPerfTool/servlet/perfservlet'
+    url = httpprotocol + '://' + ip + ':' + port + '/wasPerfTool/servlet/perfservlet'
     if os.path.isfile(cachereffile):
         timeelapsed = time.time() - os.path.getmtime(cachereffile)
         if timeelapsed > refcacheinterval:
@@ -415,33 +433,23 @@ def parsecmdargs():
     parser.add_argument("-C", type=str, action="store", dest='CellName', help="Cell name", required=True)
     subparsers = parser.add_subparsers(help='Commands', dest='command_name')
     retrieve_parser = subparsers.add_parser('retrieve', help='Retrieve Data and Store them')
-    retrieve_parser.add_argument("-N", type=str, action="store", dest='IPAddress',
-                                 help="IP Address of perfservlet server", required=True)
-    retrieve_parser.add_argument("-P", type=str, action="store", dest='Port', help="Port of perfservlet server",
-                                 required=True)
-    retrieve_parser.add_argument("-H", type=str, action="store", dest='HttpProtocol', choices=['http', 'https'],
-                                 help="Perfservlet HTTP Protocol", default='http', required=False)
-    retrieve_parser.add_argument("-u", type=str, action="store", dest='Username',
-                                 help="Perfservlet authorized user", default='', required=False)
-    retrieve_parser.add_argument("-p", type=str, action="store", dest='Password',
-                                 help="Perfservlet user password", default='', required=False)
+    retrieve_parser.add_argument("-N", type=str, action="store", dest='IPAddress', help="IP Address of perfservlet server", required=True)
+    retrieve_parser.add_argument("-P", type=str, action="store", dest='Port', help="Port of perfservlet server", required=True)
+    retrieve_parser.add_argument("-H", type=str, action="store", dest='HttpProtocol', choices=['http', 'https'], help="Perfservlet HTTP Protocol", default='http', required=False)
+    retrieve_parser.add_argument("-u", type=str, action="store", dest='Username', help="Perfservlet authorized user", default='', required=False)
+    retrieve_parser.add_argument("-p", type=str, action="store", dest='Password', help="Perfservlet user password", default='', required=False)
     show_parser = subparsers.add_parser('show', help='Show metrics')
     show_parser.add_argument("-n", type=str, action="store", dest='NodeName', help="Node Name", required=True)
     show_parser.add_argument("-s", type=str, action="store", dest='ServerName', help="Server Name", required=True)
-    show_parser.add_argument("-M", type=str, action="store", dest='Metric',
-                             choices=['WebContainer', 'ORB', 'DBConnectionPool', 'Heap', 'LiveSessions',
-                                      'SIBDestinations'],
-                             help="Metric Type", required=True)
-    show_parser.add_argument("-d", type=str, action="store", dest='Destination', help="SIB Destination Name",
-                             required=False)
-    show_parser.add_argument("-c", type=int, action="store", dest='Critical', choices=xrange(1, 100),
-                             help="Critical Value for Metric", required=False)
-    show_parser.add_argument("-w", type=int, action="store", dest='Warning', choices=xrange(1, 100),
-                             help="Warning Value for Metric", required=False)
+    show_parser.add_argument("-M", type=str, action="store", dest='Metric', choices=['WebContainer', 'ORB', 'DBConnectionPool', 'Heap', 'LiveSessions', 'SIBDestinations'], help="Metric Type", required=True)
+    show_parser.add_argument("-d", type=str, action="store", dest='Destination', help="SIB Destination Name", required=False)
+    show_parser.add_argument("-j", type=str, action="store", dest='JndiName', help="JNDI Name", required=False)
+    show_parser.add_argument("-c", type=int, action="store", dest='Critical', choices=xrange(1, 100), help="Critical Value for Metric", required=False)
+    show_parser.add_argument("-w", type=int, action="store", dest='Warning', choices=xrange(1, 100), help="Warning Value for Metric", required=False)
     return parser.parse_args()
 
 
-def queryperfdata(path, cellname, nodename, servername, metric, warning, critical, destination=None):
+def queryperfdata(path, cellname, nodename, servername, metric, warning, critical, destination=None, jndiname=None):
     """Fundamental Perfservlet Data Query Method - Used by Nagios show Check
     :param path: Where selve file lies
     :param cellname: the WAS Cell Name
@@ -450,6 +458,7 @@ def queryperfdata(path, cellname, nodename, servername, metric, warning, critica
     :param metric: Pick one of WebContainer, ORB, DBConnectionPool, Heap, LiveSessions, SIBDestinations
     :param warning: Warning threshold
     :param critical: Critical threshold
+    :param jndiname: JNDI Name. Must be defined if Metric = DBConnectionPool
     :param destination: Destination Name. Must be defined if Metric = SIBDestinations
     :return: Nagios Message
     """
@@ -468,7 +477,10 @@ def queryperfdata(path, cellname, nodename, servername, metric, warning, critica
         elif metric == 'ORB':
             return appsrv.queryorb(warning, critical)
         elif metric == 'DBConnectionPool':
-            return appsrv.querydbconnpool(warning, critical)
+            if jndiname is not None:
+                return appsrv.querydbconnpool(jndiname, warning, critical)
+            else:
+                return UNKNOWN, 'Please set datasource JNDI name using -j JndiName'
         elif metric == 'Heap':
             return appsrv.queryheapusage(warning, critical)
         elif metric == 'LiveSessions':
@@ -513,14 +525,25 @@ if __name__ == '__main__':
     arguments = parsecmdargs()
     if arguments.command_name == 'retrieve':
         # Perfservlet Data Collector Operation
-        status, message = retrieveperfxml(path=startingpath, cellname=arguments.CellName, ip=arguments.IPAddress,
-                                          port=arguments.Port, httpprotocol=arguments.HttpProtocol, username=arguments.Username, password=arguments.Password)
+        status, message = retrieveperfxml(path=startingpath, 
+                                          cellname=arguments.CellName, 
+                                          ip=arguments.IPAddress,
+                                          port=arguments.Port, 
+                                          httpprotocol=arguments.HttpProtocol,
+                                          username=arguments.Username, 
+                                          password=arguments.Password)
         if status == OK:
             parseperfxml(path=startingpath, cellname=arguments.CellName)
         show(status, message)
     elif arguments.command_name == 'show':
         # Nagios Check Perfservlet Data stored in Python selve file
-        status, message = queryperfdata(startingpath, arguments.CellName, arguments.NodeName, arguments.ServerName,
-                                        arguments.Metric, arguments.Warning, arguments.Critical,
-                                        destination=arguments.Destination)
+        status, message = queryperfdata(startingpath, 
+                                        arguments.CellName, 
+                                        arguments.NodeName, 
+                                        arguments.ServerName, 
+                                        arguments.Metric, 
+                                        arguments.Warning, 
+                                        arguments.Critical, 
+                                        destination=arguments.Destination,
+                                        jndiname=arguments.JndiName)
         show(status, message)
