@@ -19,9 +19,9 @@ The plugin can monitor the following WAS metrics of a WebSphere Cell:
 1. **Perfservlet App**
     Install the PerfServletApp.ear in one WAS server of your WebSphere Cell.
     This is located in `<WAS_ROOT>/installableApps`, i.e. this would be in `/opt/IBM/WebSphere/AppServer/installableApps` in a Unix System.
-2. **Python version greater than 2.7** installed at the Nagios host
+2. **Python version 2.7** installed at the Nagios host
 
-The plugin is tested to work with WAS version 8.5.
+The plugin is tested to work with WAS version 8.5. Here's a [script to install perfServlet](https://docs.google.com/document/d/1Y83R0zgeb-ns1zIb_eCzB23ajzjmVphChCxOim56hjw/edit#bookmark=id.mgnntqet769o)
 
 ##Setup
 
@@ -31,15 +31,22 @@ The plugin is tested to work with WAS version 8.5.
 
 ```
 #Check_perfservlet commands
+#The -H -u -p parameters are optional
+#depending on whether you use https and/or Basic Auth credentials to access the perfservlet
 
 define command{
         command_name    check_perfserv_retriever
-        command_line    $USER1$/perfservmon.py -C $ARG1$ retrieve -N $ARG2$ -P $ARG3$
+        command_line    $USER1$/perfservmon.py -C $ARG1$ retrieve -N $ARG2$ -P $ARG3$ -H $ARG4$ -u $ARG5$ -p $ARG6$
         }
 
 define command{
         command_name    check_perfserv_show
         command_line    $USER1$/perfservmon.py -C $ARG1$ show -n $ARG2$ -s $ARG3$ -M $ARG4$ -c $ARG5$ -w $ARG6$
+        }
+
+define command{
+        command_name    check_perfserv_show_dcp
+        command_line    $USER1$/perfservmon.py -C $ARG1$ show -n $ARG2$ -s $ARG3$ -M DBConnectionPool -j $ARG4$ -c $ARG5$ -w $ARG6$
         }
 
 define command{
@@ -58,13 +65,15 @@ define service{
         use                             local-service        
         host_name                       <WAS_Host>
         service_description             Collect PerfServlet data from Cell
-        check_command                   check_perfserv_retriever!<WAS_Cell_Name>!<PerfServ_hostname>!<PerfServ_Port>
+        check_command                   check_perfserv_retriever!<WAS_Cell_Name>!<PerfServ_hostname>!<PerfServ_Port>![http|https]!userid!passwd
         }
  ```
  Where:
  * WAS_Cell_Name = The name of the Websphere Cell
  * PerfServ_hostname = The IP Address/Hostname of where perfservlet Application runs
  * PerfServ_Port = The Port of where perfservlet Application runs
+ 
+ Optionally set the HTTP protocol(http or https) and/or the Basic Authentication credentials for accessing the PerfServlet Application.
  
  This is the check that collects all the relevant perfserv data of all nodes/servers from perfservlet and stores them localy as a Python selve file.
  
@@ -88,7 +97,7 @@ define service{
         use                             collector-service        
         host_name                       <WAS_Host>
         service_description             Collect PerfServlet data from Cell
-        check_command                   check_perfserv_retriever!<WAS_Cell_Name>!<PerfServ_hostname>!<PerfServ_Port>
+        check_command                   check_perfserv_retriever!<WAS_Cell_Name>!<PerfServ_hostname>!<PerfServ_Port>![http|https]!userid!passwd
         }
  ```
  
@@ -125,7 +134,7 @@ define service{
         use                             local-service
         host_name                       <WAS_Host>
         service_description             WAS ConnectionPool Usage
-        check_command                   check_perfserv_show!<WAS_Cell_Name>!<WAS_Node_Name>!<WAS_server_name>!DBConnectionPool!<Critical Percentage>!<Warning Percentage>
+        check_command                   check_perfserv_show_dcp!<WAS_Cell_Name>!<WAS_Node_Name>!<WAS_server_name>!<JNDI_name>!<Critical Percentage>!<Warning Percentage>
         }
 ```
 
@@ -170,4 +179,3 @@ define service{
         check_command                   check_perfserv_show_sib!<WAS_Cell_Name>!<WAS_Node_Name>!<WAS_server_name>!_SYSTEM.Exception.Destination.<WAS_Node_Name>.<WAS_server_name>-<SIBus_Name>!<No_Messages_Critical>!<No_Messages_Warning>
         }
 ```
-
