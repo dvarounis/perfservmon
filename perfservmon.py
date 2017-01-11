@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/opt/python2.7/bin/python2.7
 """
 @author: varounisdi
 @author: atterdag
@@ -201,6 +201,32 @@ class TypicalApplicationServer(GenericServer):
             else:
                 return OK, msg
 
+    def querysecauthen(self, warning=2, critical=5):
+        if self.webSecAuthenTime is None:
+            return UNKNOWN, 'Could not find Web Authentication Time metrics for server %s' % self.name
+        else:
+            webSecAuthenTime = int(self.webSecAuthenTime)
+            msg = 'Web Authentication Time: %s seconds' % (self.webSecAuthenTime)
+            if warning < webSecAuthenTime < critical:
+                return WARNING, msg
+            elif webSecAuthenTime >= critical:
+                return CRITICAL, msg
+            else:
+                return OK, msg
+
+    def querysecauthor(self, warning=2, critical=5):
+        if self.webSecAuthorTime is None:
+            return UNKNOWN, 'Could not find Web Authorization Time metrics for server %s' % self.name
+        else:
+            webSecAuthorTime = int(self.webSecAuthorTime)
+            msg = 'Web Authorization Time: %s seconds' % (self.webSecAuthorTime)
+            if warning < webSecAuthorTime < critical:
+                return WARNING, msg
+            elif webSecAuthorTime >= critical:
+                return CRITICAL, msg
+            else:
+                return OK, msg
+
     def querylivesessions(self):
         if len(self.livesessions) == 0 or self.totallivesessions is None:
             return UNKNOWN, 'Could not find Live Session metrics for server %s' % self.name
@@ -241,7 +267,9 @@ def parseperfxml(path, cellname):
     xmlfilename = path + cellname + '.xml'
     shelvefilename = path + cellname + '.dbm'
     pfile = shelve.open(shelvefilename, flag='c')
-    metrics = {'JVM Runtime': parsejvmstats,
+    metrics = {'Security Authentication': parsesecauthen,
+               'Security Authorization': parsesecauthor,
+               'JVM Runtime': parsejvmstats,
                'WebContainer': parsewebcontstats,
                'Object Request Broker': parseorbtpstats,
                'JDBC Connection Pools': parseconnpoolsstats,
@@ -271,6 +299,18 @@ def parsejvmstats(was, stat):
             was.maxheapMB = int(jvmstat.attrib['upperBound']) / 1024
         if jvmstat.attrib['name'] == 'UsedMemory':
             was.heapusedMB = int(jvmstat.attrib['count']) / 1024
+
+
+def parsesecauthen(was, stat):
+    for secauthen in stat.iter():
+        if secauthen.attrib['name'] == 'WebAuthenticationTime':
+            was.webSecAuthenTime = int(secauthen.attrib['max']) / 1000
+
+
+def parsesecauthor(was, stat):
+    for secauthor in stat.iter():
+        if secauthor.attrib['name'] == 'WebAuthorizationTime':
+            was.webSecAuthorTime = int(secauthor.attrib['max']) / 1000
 
 
 def parsewebcontstats(was, stat):
@@ -441,7 +481,7 @@ def parsecmdargs():
     show_parser = subparsers.add_parser('show', help='Show metrics')
     show_parser.add_argument("-n", type=str, action="store", dest='NodeName', help="Node Name", required=True)
     show_parser.add_argument("-s", type=str, action="store", dest='ServerName', help="Server Name", required=True)
-    show_parser.add_argument("-M", type=str, action="store", dest='Metric', choices=['WebContainer', 'ORB', 'DBConnectionPool', 'Heap', 'LiveSessions', 'SIBDestinations'], help="Metric Type", required=True)
+    show_parser.add_argument("-M", type=str, action="store", dest='Metric', choices=['WebContainer', 'ORB', 'DBConnectionPool', 'Heap', 'LiveSessions', 'SIBDestinations', 'WebAuthenticationTime', 'WebAuthorizationTime'], help="Metric Type", required=True)
     show_parser.add_argument("-d", type=str, action="store", dest='Destination', help="SIB Destination Name", required=False)
     show_parser.add_argument("-j", type=str, action="store", dest='JndiName', help="JNDI Name", required=False)
     show_parser.add_argument("-c", type=int, action="store", dest='Critical', choices=xrange(1, 100), help="Critical Value for Metric", required=False)
@@ -455,7 +495,7 @@ def queryperfdata(path, cellname, nodename, servername, metric, warning, critica
     :param cellname: the WAS Cell Name
     :param nodename: the WAS Node Name
     :param servername: the WAS Server Name
-    :param metric: Pick one of WebContainer, ORB, DBConnectionPool, Heap, LiveSessions, SIBDestinations
+    :param metric: Pick one of WebContainer, ORB, DBConnectionPool, Heap, LiveSessions, SIBDestinations, WebAuthenticationTime, WebAuthorizationTime
     :param warning: Warning threshold
     :param critical: Critical threshold
     :param jndiname: JNDI Name. Must be defined if Metric = DBConnectionPool
@@ -481,6 +521,10 @@ def queryperfdata(path, cellname, nodename, servername, metric, warning, critica
                 return appsrv.querydbconnpool(jndiname, warning, critical)
             else:
                 return UNKNOWN, 'Please set datasource JNDI name using -j JndiName'
+        elif metric == 'WebAuthenticationTime':
+            return appsrv.querysecauthen(warning, critical)
+        elif metric == 'WebAuthorizationTime':
+            return appsrv.querysecauthor(warning, critical)
         elif metric == 'Heap':
             return appsrv.queryheapusage(warning, critical)
         elif metric == 'LiveSessions':
