@@ -1,4 +1,4 @@
-#!/opt/python2.7/bin/python2.7
+#!/usr/bin/python
 """
 @author: varounisdi
 @author: atterdag
