@@ -103,6 +103,7 @@ class TypicalApplicationServer(GenericServer):
         GenericServer.__init__(self, name, nodename)
         self.wcpoolsize = None
         self.wcactive = None
+        self.wcthreadshung = None
         self.orbpoolsize = None
         self.orbactive = None
         self.connpoolspercentused = {}
@@ -121,6 +122,7 @@ class TypicalApplicationServer(GenericServer):
         GenericServer.printserver(self)
         print 'WebContainerActive:' + str(self.wcactive)
         print 'WebContainerPoolSize:' + str(self.wcpoolsize)
+        print 'WebContainerConcurrentHungThreadCount:' + str(self.wcthreadshung)
         print 'ORBActive:' + str(self.orbactive)
         print 'ORBPoolSize:' + str(self.orbpoolsize)
         print 'JDBC Conn Pools Percent Used:' + str(self.connpoolspercentused)
@@ -158,13 +160,26 @@ class TypicalApplicationServer(GenericServer):
 
     def querywebcontainer(self, warning=75, critical=90):
         if self.wcactive is None or self.wcpoolsize is None:
-            return UNKNOWN, 'Could not find WebContainer metrics for server %s' % self.name
+            return UNKNOWN, 'Could not find WebContainer Usage metrics for server %s' % self.name
         else:
             percentused = int(float(self.wcactive) / float(self.wcpoolsize) * 100)
             msg = 'WebContainer Thread Pool: %s/%s (%s%%)' % (self.wcactive, self.wcpoolsize, percentused)
             if warning < percentused < critical:
                 return WARNING, msg
             elif percentused >= critical:
+                return CRITICAL, msg
+            else:
+                return OK, msg
+
+    def querywebcontainerhungthreads(self, warning=75, critical=90):
+        if self.wcthreadshung is None:
+            return UNKNOWN, 'Could not find WebContainer Thread Hung metrics for server %s' % self.name
+        else:
+            wcthreadshung = int(self.wcthreadshung)
+            msg = 'WebContainer Declared Thread Hung: %s' % (self.wcthreadshung)
+            if warning < wcthreadshung < critical:
+                return WARNING, msg
+            elif wcthreadshung >= critical:
                 return CRITICAL, msg
             else:
                 return OK, msg
@@ -397,6 +412,9 @@ def parsewebcontstats(was, stat):
             was.wcactive = wcstat.attrib['value']
         if wcstat.attrib['name'] == 'PoolSize':
             was.wcpoolsize = wcstat.attrib['upperBound']
+    for wcstat in stat.iter('CountStatistic'):
+        if wcstat.attrib['name'] == 'DeclaredThreadHungCount':
+            was.wcthreadshung = wcstat.attrib['count']
 
 
 def parseorbtpstats(was, stat):
@@ -568,7 +586,7 @@ def parsecmdargs():
     show_parser = subparsers.add_parser('show', help='Show metrics')
     show_parser.add_argument("-n", type=str, action="store", dest='NodeName', help="Node Name", required=True)
     show_parser.add_argument("-s", type=str, action="store", dest='ServerName', help="Server Name", required=True)
-    show_parser.add_argument("-M", type=str, action="store", dest='Metric', choices=['WebContainer', 'ORB', 'DBConnectionPoolPercentUsed', 'DBConnectionPoolUseTime', 'DBConnectionPoolWaitTime', 'DBConnectionPoolWaitingThreadCount', 'Heap', 'LiveSessions', 'SIBDestinations', 'WebAuthenticationTime', 'WebAuthorizationTime'], help="Metric Type", required=True)
+    show_parser.add_argument("-M", type=str, action="store", dest='Metric', choices=['WebContainer', 'WebContainerThreadHung', 'ORB', 'DBConnectionPoolPercentUsed', 'DBConnectionPoolUseTime', 'DBConnectionPoolWaitTime', 'DBConnectionPoolWaitingThreadCount', 'Heap', 'LiveSessions', 'SIBDestinations', 'WebAuthenticationTime', 'WebAuthorizationTime'], help="Metric Type", required=True)
     show_parser.add_argument("-d", type=str, action="store", dest='Destination', help="SIB Destination Name", required=False)
     show_parser.add_argument("-j", type=str, action="store", dest='JndiName', help="JNDI Name", required=False)
     show_parser.add_argument("-c", type=int, action="store", dest='Critical', choices=xrange(1, 100), help="Critical Value for Metric", required=False)
@@ -601,6 +619,8 @@ def queryperfdata(path, cellname, nodename, servername, metric, warning, critica
         appsrv = perffile[serverfullname]
         if metric == 'WebContainer':
             return appsrv.querywebcontainer(warning, critical)
+        if metric == 'WebContainerThreadHung':
+            return appsrv.querywebcontainerhungthreads(warning, critical)
         elif metric == 'ORB':
             return appsrv.queryorb(warning, critical)
         elif metric == 'DBConnectionPoolPercentUsed':
