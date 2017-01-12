@@ -1,16 +1,22 @@
 #perfservmon
 
-[![Code Issues](https://www.quantifiedcode.com/api/v1/project/6029a3ce1c814915ae94f9841332b754/badge.svg)](https://www.quantifiedcode.com/app/project/6029a3ce1c814915ae94f9841332b754)
+[![Code Issues](https://www.quantifiedcode.com/api/v1/project/8e9cc5eb436548b589f247747eabd215/badge.svg)](https://www.quantifiedcode.com/app/project/8e9cc5eb436548b589f247747eabd215)
 
 *Perfservmon* is  a *Nagios Plugin* for *IBM Websphere Application Server(WAS)* using the perfservlet web application that comes with each WAS 
 installation.
 
 The plugin can monitor the following WAS metrics of a WebSphere Cell:
 
+- Web authentication time
+- Web authorization time
 - Heap Usage
 - Web Container Thread Pool Usage
+- Web Container Declared Threads Hung
 - ORB Thread Pool Usage
-- JDBC Connection Pool Usage
+- JDBC Data Source Connection Pool Usage
+- JDBC Data Source Connection Pool Use Time
+- JDBC Data Source Connection Pool Wait Time
+- JDBC Data Source Connection Pool Waiting Threads
 - Live HTTP Sessions
 - JMS SIB Destination(Queue, Topic) Metrics
 
