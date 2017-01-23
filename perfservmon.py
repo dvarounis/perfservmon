@@ -31,6 +31,9 @@ class GenericServer:
         self.heapusedMB = None
 
     def printserver(self):
+        """
+        Print Generic Server Attributes(for debug purposes)
+        """
         print 'Name:' + str(self.name)
         print 'NodeName:' + str(self.nodename)
         print 'MaxHeap:' + str(self.maxheapMB)
@@ -112,6 +115,9 @@ class TypicalApplicationServer(GenericServer):
         self.destinations = {}
 
     def printserver(self):
+        """
+        Print Typical Server Attributes(for debug purposes)
+        """
         print '****************************'
         GenericServer.printserver(self)
         print 'WebContainerActive:' + str(self.wcactive)
@@ -308,6 +314,11 @@ def parsesessionstats(was, stat):
 
 
 def parsesibstats(was, stat):
+    """
+    Parse SIB Statistics found in  perfservlet xml and attach them in WAS Object instance
+    :param was: Current Typical Application Server instance
+    :param stat: Stat tags in perfservlet xml under the specific Server tag
+    """
     queuesnode = stat.find(".//Stat[@name='Queues']")
     if queuesnode is not None:
         for queue in queuesnode.findall('./Stat'):
@@ -338,16 +349,17 @@ def parsesibstats(was, stat):
 
 
 # #################################################################################################################
-def retrieveperfxml(path, cellname, ip, port, username, password, httpprotocol='http'):
+def retrieveperfxml(path, cellname, ip, port, username, password, httpprotocol='http', ignorecert=False):
     """
     Perfservlet XML Retrieval Method
     :param path: The file path where perfserv xml and shelve output is stored
     :param cellname: The Name of the WAS Cell
     :param ip: The ip of the perfserv appication
     :param port: The port of the perfserv appication
-    :param httpprotocol: The http protocol to access the perfservlet, can be http or https, default http
     :param username: An user which is authorized to access perfservlet
     :param password: perfservlet authorized user password
+    :param httpprotocol: The http protocol to access the perfservlet, can be http or https, default http
+    :param ignorecert: Ignore TLS Certificate, default False
     :return: The nagios message
     """
     if httpprotocol in ['http', 'https']:
@@ -363,13 +375,18 @@ def retrieveperfxml(path, cellname, ip, port, username, password, httpprotocol='
             req.add_header('Authorization', 'Basic %s' % auth_encoded)
 
         # Add SSLContext check for Python older than 2.7.9
-        if httpprotocol == 'https' and hasattr(ssl, 'SSLContext'):
+        if httpprotocol == 'https' and hasattr(ssl, 'SSLContext') and hasattr(ssl, 'Purpose') and ignorecert is False:
+            ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+            # Default Behaviour: Accept only trusted SSL certificates
+            perfserv = urllib2.urlopen(req, context=ctx, timeout=30)
+        elif httpprotocol == 'https' and hasattr(ssl, 'SSLContext') and ignorecert is True:
+            # On --ignorecert option accept any certificate
             ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
             ctx.check_hostname = False
-            # Default Behaviour: Accept any certificate
             ctx.verify_mode = ssl.CERT_NONE
             perfserv = urllib2.urlopen(req, context=ctx, timeout=30)
         else:
+            # Pre Python 2.7.9 behaviour or plain http request
             perfserv = urllib2.urlopen(req, timeout=30)
     except urllib2.HTTPError as error:
         return CRITICAL, 'Could not open perfservlet URL - Response Status Code %s' % error.code
@@ -432,6 +449,8 @@ def parsecmdargs():
                                  required=True)
     retrieve_parser.add_argument("-H", type=str, action="store", dest='HttpProtocol', choices=['http', 'https'],
                                  help="Perfservlet HTTP Protocol", default='http', required=False)
+    retrieve_parser.add_argument("--ignorecert", action="store_true",
+                                 help="Ignore TLS Server Certificate", required=False)
     retrieve_parser.add_argument("-u", type=str, action="store", dest='Username',
                                  help="Perfservlet authorized user", default='', required=False)
     retrieve_parser.add_argument("-p", type=str, action="store", dest='Password',
@@ -526,6 +545,7 @@ if __name__ == '__main__':
         # Perfservlet Data Collector Operation
         status, message = retrieveperfxml(path=startingpath, cellname=arguments.CellName, ip=arguments.IPAddress,
                                           port=arguments.Port, httpprotocol=arguments.HttpProtocol,
+                                          ignorecert=arguments.ignorecert,
                                           username=arguments.Username, password=arguments.Password)
         if status == OK:
             parseperfxml(path=startingpath, cellname=arguments.CellName)
