@@ -15,7 +15,7 @@ import os
 import time
 import base64
 import ssl
-
+import socket
 
 class GenericServer:
     """Generic WAS Server Prototype"""
@@ -362,6 +362,7 @@ def retrieveperfxml(path, cellname, ip, port, username, password, httpprotocol='
     :param ignorecert: Ignore TLS Certificate, default False
     :return: The nagios message
     """
+    urlopentimeout = 30
     if httpprotocol in ['http', 'https']:
         url = setperfservurl(ip, port, path, cellname, httpprotocol)
     else:
@@ -378,20 +379,25 @@ def retrieveperfxml(path, cellname, ip, port, username, password, httpprotocol='
         if httpprotocol == 'https' and hasattr(ssl, 'SSLContext') and hasattr(ssl, 'Purpose') and ignorecert is False:
             ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
             # Default Behaviour: Accept only trusted SSL certificates
-            perfserv = urllib2.urlopen(req, context=ctx, timeout=30)
+            perfserv = urllib2.urlopen(req, context=ctx, timeout=urlopentimeout)
         elif httpprotocol == 'https' and hasattr(ssl, 'SSLContext') and ignorecert is True:
             # On --ignorecert option accept any certificate
             ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
-            perfserv = urllib2.urlopen(req, context=ctx, timeout=30)
+            perfserv = urllib2.urlopen(req, context=ctx, timeout=urlopentimeout)
         else:
             # Pre Python 2.7.9 behaviour or plain http request
-            perfserv = urllib2.urlopen(req, timeout=30)
+            perfserv = urllib2.urlopen(req, timeout=urlopentimeout)
     except urllib2.HTTPError as error:
-        return CRITICAL, 'Could not open perfservlet URL - Response Status Code %s' % error.code
+            return CRITICAL, 'Could not open perfservlet URL - Response Status Code %s' % error.code
     except urllib2.URLError as error:
         return CRITICAL, 'Could not open perfservlet URL - %s' % error.reason
+    #Handle HTTP/HTTPS Timeouts
+    except socket.timeout:
+        return CRITICAL, 'Could not open perfservlet URL: Socket Timeout'
+    except ssl.SSLError:
+        return CRITICAL, 'Could not open perfservlet URL: SSL Error, possibly a timeout'
     else:
         with open(xmlfilename, 'w') as xmlfile:
             xmlfile.writelines(perfserv.readlines())
