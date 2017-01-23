@@ -464,10 +464,10 @@ def parsecmdargs():
                              help="Metric Type", required=True)
     show_parser.add_argument("-d", type=str, action="store", dest='Destination', help="SIB Destination Name",
                              required=False)
-    show_parser.add_argument("-c", type=int, action="store", dest='Critical', choices=xrange(1, 100),
+    show_parser.add_argument("-c", type=int, action="store", dest='Critical',
                              help="Critical Value for Metric", required=False)
-    show_parser.add_argument("-w", type=int, action="store", dest='Warning', choices=xrange(1, 100),
-                             help="Warning Value for Metric", required=False)
+    show_parser.add_argument("-w", type=int, action="store", help="Warning Value for Metric",
+                             dest='Warning', required=False)
     return parser.parse_args()
 
 
