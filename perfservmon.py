@@ -375,7 +375,7 @@ def retrieveperfxml(path, cellname, ip, port, username, password, httpprotocol='
             auth_encoded = base64.encodestring('%s:%s' % (username, password))[:-1]
             req.add_header('Authorization', 'Basic %s' % auth_encoded)
 
-        # Add SSLContext check for Python older than 2.7.9
+        # Add SSLContext check for Python newer than 2.7.9
         if httpprotocol == 'https' and hasattr(ssl, 'SSLContext') and hasattr(ssl, 'Purpose') and ignorecert is False:
             ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
             # Default Behaviour: Accept only trusted SSL certificates
@@ -393,11 +393,12 @@ def retrieveperfxml(path, cellname, ip, port, username, password, httpprotocol='
             return CRITICAL, 'Could not open perfservlet URL - Response Status Code %s' % error.code
     except urllib2.URLError as error:
         return CRITICAL, 'Could not open perfservlet URL - %s' % error.reason
-    #Handle HTTP/HTTPS Timeouts
+    # Handle HTTP Timeouts
     except socket.timeout:
         return CRITICAL, 'Could not open perfservlet URL: Socket Timeout'
+    # Handle HTTPS Timeouts
     except ssl.SSLError:
-        return CRITICAL, 'Could not open perfservlet URL: SSL Error, possibly a timeout'
+        return CRITICAL, 'Could not open perfservlet URL: Generic SSL Error, possibly a timeout'
     else:
         with open(xmlfilename, 'w') as xmlfile:
             xmlfile.writelines(perfserv.readlines())
