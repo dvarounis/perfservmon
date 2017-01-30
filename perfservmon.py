@@ -119,7 +119,8 @@ class TypicalApplicationServer(GenericServer):
         self.livesessions = {}
         self.destinations = {}
         self.webSecAuthenTime = None
-        self.jndinames = {}
+        self.webSecAuthorTime = None
+
 
     def printserver(self):
         """
@@ -204,88 +205,88 @@ class TypicalApplicationServer(GenericServer):
             else:
                 return OK, msg
 
-    def querydbconnpoolpercentused(self, jndiname, warning=75, critical=90):
+    def querydbconnpoolpercentused(self, jndiname=None, warning=75, critical=90):
         if len(self.connpoolspercentused) == 0 or self.connpoolspercentused is None:
             return UNKNOWN, 'Could not find DB Connection Pool Percent Used metrics for server %s' % self.name
         else:
-            connpoolpercentusedExist = "false"
-            statuscode = "UNKNOWN"
-            msg = "no DB Connection Pool for " + jndiname + " was found"
-            for connpoolpercentused in self.connpoolspercentused:
-                if connpoolpercentused == jndiname:
-                    connpoolpercentusedExist = "true"
-            if connpoolpercentusedExist == "true":
-                msg = 'DB Connection Pool Percent Used'
-                statuscode = OK
-                percentused = int(self.connpoolspercentused[connpoolpercentused])
-                msg += ' - %s %s%%' % (connpoolpercentused, percentused)
-                if warning < percentused < critical and statuscode == OK:
+            msg = 'DB Connection Pool Percent Used'
+            statuscode = OK
+            if jndiname is None:
+                # If no jndi name is given, show all Connection Pools
+                # alert if any is above Warn, Crit
+                for connpool in self.connpoolspercentused:
+                    percentused = int(self.connpoolspercentused[connpool])
+                    msg += ' - %s %s%%' % (connpool, percentused)
+                    # For this loop, Change statuscode only when lower status code is active
+                    # e.g. change to warning only when statuscode is OK, not critical or warning
+                    if warning < percentused < critical and statuscode == OK:
+                        statuscode = WARNING
+                    if critical <= percentused:
+                        statuscode = CRITICAL
+            elif jndiname in self.connpoolspercentused:
+                percentused = int(self.connpoolspercentused[jndiname])
+                msg += ' - %s %s%%' % (jndiname, percentused)
+                if warning < percentused < critical:
                     statuscode = WARNING
                 if critical <= percentused:
                     statuscode = CRITICAL
+            else:
+                msg = "No DB Connection Pool for " + jndiname + " was found"
+                statuscode = "UNKNOWN"
             return statuscode, msg
 
     def querydbconnpoolusetime(self, jndiname, warning=10, critical=30):
         if len(self.connpoolsusetime) == 0 or self.connpoolsusetime is None:
             return UNKNOWN, 'Could not find DB Connection Pool Use Time metrics for server %s' % self.name
         else:
-            connpoolusetimeExist = "false"
-            statuscode = "UNKNOWN"
-            msg = "no DB Connection Pool for " + jndiname + " was found"
-            for connpoolusetime in self.connpoolsusetime:
-                if connpoolusetime == jndiname:
-                    connpoolusetimeExist = "true"
-            if connpoolusetimeExist == "true":
+            if jndiname in self.connpoolsusetime:
                 msg = 'DB Connection Pool Use Time'
                 statuscode = OK
-                usetime = int(self.connpoolsusetime[connpoolusetime])
-                msg += ' - %s %s seconds' % (connpoolusetime, usetime)
-                if warning < usetime < critical and statuscode == OK:
+                usetime = int(self.connpoolsusetime[jndiname])
+                msg += ' - %s %s seconds' % (jndiname, usetime)
+                if warning < usetime < critical:
                     statuscode = WARNING
                 if critical <= usetime:
                     statuscode = CRITICAL
+            else:
+                statuscode = "UNKNOWN"
+                msg = "No DB Connection Pool for " + jndiname + " was found"
             return statuscode, msg
 
     def querydbconnpoolwaittime(self, jndiname, warning=5, critical=10):
         if len(self.connpoolswaittime) == 0 or self.connpoolswaittime is None:
             return UNKNOWN, 'Could not find DB Connection Pool Wait Time metrics for server %s' % self.name
         else:
-            connpoolwaittimeExist = "false"
-            statuscode = "UNKNOWN"
-            msg = "no DB Connection Pool for " + jndiname + " was found"
-            for connpoolwaittime in self.connpoolswaittime:
-                if connpoolwaittime == jndiname:
-                    connpoolwaittimeExist = "true"
-            if connpoolwaittimeExist == "true":
+            if jndiname in self.connpoolswaittime:
                 msg = 'DB Connection Pool Wait Time'
                 statuscode = OK
-                waittime = int(self.connpoolswaittime[connpoolwaittime])
-                msg += ' - %s %s seconds' % (connpoolwaittime, waittime)
-                if warning < waittime < critical and statuscode == OK:
+                waittime = int(self.connpoolswaittime[jndiname])
+                msg += ' - %s %s seconds' % (jndiname, waittime)
+                if warning < waittime < critical:
                     statuscode = WARNING
                 if critical <= waittime:
                     statuscode = CRITICAL
+            else:
+                statuscode = "UNKNOWN"
+                msg = "No DB Connection Pool for " + jndiname + " was found"
             return statuscode, msg
 
     def querydbconnpoolwaitingthreadcount(self, jndiname, warning=5, critical=10):
         if len(self.connpoolswaitingthreadcount) == 0 or self.connpoolswaitingthreadcount is None:
             return UNKNOWN, 'Could not find DB Connection Pool Waiting Thread Count metrics for server %s' % self.name
         else:
-            connpoolwaitingthreadcountExist = "false"
-            statuscode = "UNKNOWN"
-            msg = "no DB Connection Pool for " + jndiname + " was found"
-            for connpoolwaitingthreadcount in self.connpoolswaitingthreadcount:
-                if connpoolwaitingthreadcount == jndiname:
-                    connpoolwaitingthreadcountExist = "true"
-            if connpoolwaitingthreadcountExist == "true":
+            if jndiname in self.connpoolswaitingthreadcount:
                 msg = 'DB Connection Pool Waiting Thread Count'
                 statuscode = OK
-                waitingthreadcount = int(self.connpoolswaitingthreadcount[connpoolwaitingthreadcount])
-                msg += ' - %s %s' % (connpoolwaitingthreadcount, waitingthreadcount)
-                if warning < waitingthreadcount < critical and statuscode == OK:
+                waitingthreadcount = int(self.connpoolswaitingthreadcount[jndiname])
+                msg += ' - %s %s' % (jndiname, waitingthreadcount)
+                if warning < waitingthreadcount < critical:
                     statuscode = WARNING
                 if critical <= waitingthreadcount:
                     statuscode = CRITICAL
+            else:
+                statuscode = "UNKNOWN"
+                msg = "No DB Connection Pool for " + jndiname + " was found"
             return statuscode, msg
 
     def queryheapusage(self, warning=75, critical=90):
@@ -305,11 +306,11 @@ class TypicalApplicationServer(GenericServer):
         if self.webSecAuthenTime is None:
             return UNKNOWN, 'Could not find Web Authentication Time metrics for server %s' % self.name
         else:
-            webSecAuthenTime = int(self.webSecAuthenTime)
-            msg = 'Web Authentication Time: %s seconds' % (self.webSecAuthenTime)
-            if warning < webSecAuthenTime < critical:
+            websecauthentime = int(self.webSecAuthenTime)
+            msg = 'Web Authentication Time: %s seconds' % self.webSecAuthenTime
+            if warning < websecauthentime < critical:
                 return WARNING, msg
-            elif webSecAuthenTime >= critical:
+            elif websecauthentime >= critical:
                 return CRITICAL, msg
             else:
                 return OK, msg
@@ -318,11 +319,11 @@ class TypicalApplicationServer(GenericServer):
         if self.webSecAuthorTime is None:
             return UNKNOWN, 'Could not find Web Authorization Time metrics for server %s' % self.name
         else:
-            webSecAuthorTime = int(self.webSecAuthorTime)
-            msg = 'Web Authorization Time: %s seconds' % (self.webSecAuthorTime)
-            if warning < webSecAuthorTime < critical:
+            websecauthortime = int(self.webSecAuthorTime)
+            msg = 'Web Authorization Time: %s seconds' % self.webSecAuthorTime
+            if warning < websecauthortime < critical:
                 return WARNING, msg
-            elif webSecAuthorTime >= critical:
+            elif websecauthortime >= critical:
                 return CRITICAL, msg
             else:
                 return OK, msg
@@ -387,7 +388,8 @@ def parseperfxml(path, cellname):
                     if metricname is not None and metricname in metrics:
                         # For each metric call the appropriate method
                         metrics[metricname](was, stat)
-                # was.printserver()
+                # Comment out for debug purposes
+                #was.printserver()
                 pfile[was.serverfullname()] = was
     except AttributeError:
         raise
@@ -441,12 +443,13 @@ def parseconnpoolsstats(was, stat):
             connpoolwaitingthreadcount = connpool.find(".//RangeStatistic[@name='WaitingThreadCount']")
             if connpoolwaitingthreadcount is not None:
                 was.addjdbcconnpoolwaitingthreadcount(connpool.attrib['name'], connpoolwaitingthreadcount.attrib['value'])
+            # The following values are measured in ms, convert to seconds
             connpoolusetime = connpool.find(".//TimeStatistic[@name='UseTime']")
             if connpoolusetime is not None:
-                was.addjdbcconnpoolusetime(connpool.attrib['name'], connpoolusetime.attrib['max'])
+                was.addjdbcconnpoolusetime(connpool.attrib['name'], int(connpoolusetime.attrib['max'])/1000)
             connpoolwaittime = connpool.find(".//TimeStatistic[@name='WaitTime']")
             if connpoolwaittime is not None:
-                was.addjdbcconnpoolwaittime(connpool.attrib['name'], connpoolwaittime.attrib['max'])
+                was.addjdbcconnpoolwaittime(connpool.attrib['name'], int(connpoolwaittime.attrib['max'])/1000)
 
 
 def parsesessionstats(was, stat):
@@ -619,7 +622,9 @@ def parsecmdargs():
     show_parser.add_argument("-n", type=str, action="store", dest='NodeName', help="Node Name", required=True)
     show_parser.add_argument("-s", type=str, action="store", dest='ServerName', help="Server Name", required=True)
     show_parser.add_argument("-M", type=str, action="store", dest='Metric',
-                             choices=['WebContainer', 'WebContainerThreadHung', 'ORB', 'DBConnectionPoolPercentUsed', 'DBConnectionPoolUseTime', 'DBConnectionPoolWaitTime', 'DBConnectionPoolWaitingThreadCount', 'Heap', 'LiveSessions',
+                             choices=['WebContainer', 'WebContainerThreadHung', 'ORB', 'DBConnectionPoolPercentUsed',
+                                      'DBConnectionPoolUseTime', 'DBConnectionPoolWaitTime',
+                                      'DBConnectionPoolWaitingThreadCount', 'Heap', 'LiveSessions',
                                       'SIBDestinations', 'WebAuthenticationTime', 'WebAuthorizationTime'],
                              help="Metric Type", required=True)
     show_parser.add_argument("-d", type=str, action="store", dest='Destination', help="SIB Destination Name",
@@ -662,10 +667,7 @@ def queryperfdata(path, cellname, nodename, servername, metric, warning, critica
         elif metric == 'ORB':
             return appsrv.queryorb(warning, critical)
         elif metric == 'DBConnectionPoolPercentUsed':
-            if jndiname is not None:
-                return appsrv.querydbconnpoolpercentused(jndiname, warning, critical)
-            else:
-                return UNKNOWN, 'Please set datasource JNDI name using -j JndiName'
+            return appsrv.querydbconnpoolpercentused(jndiname, warning, critical)
         elif metric == 'DBConnectionPoolUseTime':
             if jndiname is not None:
                 return appsrv.querydbconnpoolusetime(jndiname, warning, critical)
