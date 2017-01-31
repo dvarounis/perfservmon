@@ -18,6 +18,7 @@ import base64
 import ssl
 import socket
 
+
 class GenericServer:
     """Generic WAS Server Prototype"""
 
@@ -121,7 +122,6 @@ class TypicalApplicationServer(GenericServer):
         self.webSecAuthenTime = None
         self.webSecAuthorTime = None
 
-
     def printserver(self):
         """
         Print Typical Server Attributes(for debug purposes)
@@ -184,7 +184,7 @@ class TypicalApplicationServer(GenericServer):
             return UNKNOWN, 'Could not find WebContainer Thread Hung metrics for server %s' % self.name
         else:
             wcthreadshung = int(self.wcthreadshung)
-            msg = 'WebContainer Declared Thread Hung: %s' % (self.wcthreadshung)
+            msg = 'WebContainer Declared Thread Hung: %s' % self.wcthreadshung
             if warning < wcthreadshung < critical:
                 return WARNING, msg
             elif wcthreadshung >= critical:
@@ -643,7 +643,9 @@ def queryperfdata(path, cellname, nodename, servername, metric, warning, critica
     :param cellname: the WAS Cell Name
     :param nodename: the WAS Node Name
     :param servername: the WAS Server Name
-    :param metric: Pick one of WebContainer, ORB, DBConnectionPoolPercentUsed, DBConnectionPoolUseTime, DBConnectionPoolWaitTime, DBConnectionPoolWaitingThreadCount, Heap, LiveSessions, SIBDestinations, WebAuthenticationTime, WebAuthorizationTime
+    :param metric: Pick one of WebContainer, ORB, DBConnectionPoolPercentUsed, DBConnectionPoolUseTime,
+    DBConnectionPoolWaitTime, DBConnectionPoolWaitingThreadCount, Heap, LiveSessions, SIBDestinations,
+    WebAuthenticationTime, WebAuthorizationTime
     :param warning: Warning threshold
     :param critical: Critical threshold
     :param jndiname: JNDI Name. Must be defined if Metric = DBConnectionPool*
