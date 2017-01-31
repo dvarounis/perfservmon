@@ -52,7 +52,7 @@ define command{
 
 define command{
         command_name    check_perfserv_show_dcp
-        command_line    $USER1$/perfservmon.py -C $ARG1$ show -n $ARG2$ -s $ARG3$ -M DBConnectionPool -j $ARG4$ -c $ARG5$ -w $ARG6$
+        command_line    $USER1$/perfservmon.py -C $ARG1$ show -n $ARG2$ -s $ARG3$ -M DBConnectionPoolPercentUsed -j $ARG4$ -c $ARG5$ -w $ARG6$
         }
 
 define command{
@@ -71,7 +71,7 @@ define service{
         use                             local-service        
         host_name                       <WAS_Host>
         service_description             Collect PerfServlet data from Cell
-        check_command                   check_perfserv_retriever!<WAS_Cell_Name>!<PerfServ_hostname>!<PerfServ_Port>![http|https]!userid!passwd
+        check_command                   check_perfserv_retriever!<WAS_Cell_Name>!<PerfServ_hostname>!<PerfServ_Port>![http|https]!userid!passwd![--ignorecert]
         }
  ```
  Where:
@@ -80,6 +80,7 @@ define service{
  * PerfServ_Port = The Port of where perfservlet Application runs
  
  Optionally set the HTTP protocol(http or https) and/or the Basic Authentication credentials for accessing the PerfServlet Application.
+ In the case of an https connection you may use (although not recommended) the --ignorecert option to ignore any TLS certificate issues. 
  
  This is the check that collects all the relevant perfserv data of all nodes/servers from perfservlet and stores them localy as a Python selve file.
  
@@ -140,6 +141,17 @@ define service{
         use                             local-service
         host_name                       <WAS_Host>
         service_description             WAS ConnectionPool Usage
+        check_command                   check_perfserv_show!<WAS_Cell_Name>!<WAS_Node_Name>!<WAS_server_name>!DBConnectionPoolPercentUsed!<Critical Percentage>!<Warning Percentage>
+        }
+```
+
+Shows a specific connection pool of the WAS Server (specified with <JNDI_name>) and show an alert when its usage exceeds the percentage limits.
+
+```
+define service{
+        use                             local-service
+        host_name                       <WAS_Host>
+        service_description             WAS ConnectionPool JNDI_name Usage
         check_command                   check_perfserv_show_dcp!<WAS_Cell_Name>!<WAS_Node_Name>!<WAS_server_name>!<JNDI_name>!<Critical Percentage>!<Warning Percentage>
         }
 ```
