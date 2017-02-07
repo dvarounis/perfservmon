@@ -214,20 +214,24 @@ class TypicalApplicationServer(GenericServer):
         if len(self.connpoolspercentused) == 0 or self.connpoolspercentused is None:
             return UNKNOWN, 'Could not find DB Connection Pool Percent Used metrics for server {}'.format(self.name)
         else:
-            msg = 'DB Connection Pool Percent Used'
             statuscode = OK
             if jndiname is None:
                 # If no jndi name is given, show all Connection Pools
-                # alert if any is above Warn, Crit
+                # alert if ANY is above Warn, Crit
+                msg = 'DB Connection Pool Percent Used'
+                perfdata = '|'
                 for connpool in self.connpoolspercentused:
                     percentused = int(self.connpoolspercentused[connpool])
-                    msg += ' - %s %s%%' % (connpool, percentused)
+                    msg += ' - {connpool} {pc}%'.format(connpool=connpool, pc=percentused)
+                    perfdata += '{connpool}_usage={pc}%;{warn};{crit} '\
+                        .format(connpool=connpool, pc=percentused, warn=warning, crit=critical)
                     # For this loop, Change statuscode only when lower status code is active
                     # e.g. change to warning only when statuscode is OK, not critical or warning
                     if warning < percentused < critical and statuscode == OK:
                         statuscode = WARNING
                     if critical <= percentused:
                         statuscode = CRITICAL
+                msg += perfdata
             elif jndiname in self.connpoolspercentused:
                 percentused = int(self.connpoolspercentused[jndiname])
                 msg = 'DB Connection Pool Percent Used - {jndi} {pc}%|{jndi}_usage={pc}%;{warn};{crit}'\
@@ -346,9 +350,13 @@ class TypicalApplicationServer(GenericServer):
         if len(self.livesessions) == 0 or self.totallivesessions is None:
             return UNKNOWN, 'Could not find Live Session metrics for server {}'.format(self.name)
         else:
-            msg = 'live sessions: total %s' % self.totallivesessions
+            msg = 'live sessions: total {totalsessions}'.format(totalsessions=self.totallivesessions)
+            perfdata = '|totallivesessions={totalsessions};;;0'.format(totalsessions=self.totallivesessions)
             for appmodule in self.livesessions:
-                msg += ' , %s %s' % (appmodule, str(self.livesessions[appmodule]))
+                msg += ' , {mod} {livesessions!s}'.format(mod=appmodule, livesessions=self.livesessions[appmodule])
+                perfdata += " '{mod}_sessions'={livesessions!s};;;0"\
+                    .format(mod=appmodule, livesessions=self.livesessions[appmodule])
+            msg += perfdata
             return OK, msg
 
     def querysibdestination(self, destname, waitingmsgcountwarn=10, waitingmsgcountcrit=100):
@@ -356,12 +364,19 @@ class TypicalApplicationServer(GenericServer):
             return UNKNOWN, 'Could not find Destination metrics for server {}'.format(self.name)
         else:
             destination = self.destinations[destname]
-            msg = 'Destination:%s - Available Messages:%s , Messages Consumed:%s ' % (
-                destination.Name, destination.AvailableMessages, destination.TotalMessagesConsumed)
+            msg = 'Destination:{dname} - Available Messages:{davail} , Messages Consumed:{dtotalmsgcon} '\
+                .format(dname=destination.Name, davail=destination.AvailableMessages,
+                        dtotalmsgcon=destination.TotalMessagesConsumed)
             if isinstance(destination, SIBTopicSpace) and len(destination.subscribers) > 0:
                 msg += ' , Durable Subscribers:'
                 for subscriber in destination.subscribers:
                     msg += '%s ' % subscriber
+            msg += '|{dname}_AvailMsgs={davail};{warn};{crit};0 {dname}_ConsumMsgs={dtotalmsgcon};;;0'\
+                .format(dname=destination.Name,
+                        davail=destination.AvailableMessages,
+                        dtotalmsgcon=destination.TotalMessagesConsumed,
+                        warn=waitingmsgcountwarn,
+                        crit=waitingmsgcountcrit)
             if waitingmsgcountwarn < int(destination.AvailableMessages) < waitingmsgcountcrit:
                 return WARNING, msg
             elif int(destination.AvailableMessages) > waitingmsgcountcrit:
