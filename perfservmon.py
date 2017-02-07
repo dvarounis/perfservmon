@@ -168,10 +168,12 @@ class TypicalApplicationServer(GenericServer):
 
     def querywebcontainer(self, warning=75, critical=90):
         if self.wcactive is None or self.wcpoolsize is None:
-            return UNKNOWN, 'Could not find WebContainer Usage metrics for server %s' % self.name
+            return UNKNOWN, 'Could not find WebContainer Usage metrics for server {}'.format(self.name)
         else:
             percentused = int(float(self.wcactive) / float(self.wcpoolsize) * 100)
-            msg = 'WebContainer Thread Pool: %s/%s (%s%%)' % (self.wcactive, self.wcpoolsize, percentused)
+            msg = 'WebContainer Thread Pool: {actv}/{sz} ({pc}%)|' \
+                  'wcthreadpoolusage={pc}%;{warn};{crit} wcthreadpoolused={actv};;;0;{sz}'\
+                .format(actv=self.wcactive, sz=self.wcpoolsize, pc=percentused, warn=warning, crit=critical)
             if warning < percentused < critical:
                 return WARNING, msg
             elif percentused >= critical:
@@ -181,10 +183,11 @@ class TypicalApplicationServer(GenericServer):
 
     def querywebcontainerhungthreads(self, warning=75, critical=90):
         if self.wcthreadshung is None:
-            return UNKNOWN, 'Could not find WebContainer Thread Hung metrics for server %s' % self.name
+            return UNKNOWN, 'Could not find WebContainer Thread Hung metrics for server {}'.format(self.name)
         else:
             wcthreadshung = int(self.wcthreadshung)
-            msg = 'WebContainer Declared Thread Hung: %s' % self.wcthreadshung
+            msg = 'WebContainer Declared Thread Hung: {thrh}|wcthreadhung={thrh};{warn};{crit};0'\
+                .format(thrh=self.wcthreadshung, warn=warning, crit=critical)
             if warning < wcthreadshung < critical:
                 return WARNING, msg
             elif wcthreadshung >= critical:
@@ -194,10 +197,12 @@ class TypicalApplicationServer(GenericServer):
 
     def queryorb(self, warning=75, critical=90):
         if self.orbactive is None or self.orbpoolsize is None:
-            return UNKNOWN, 'Could not find ORB metrics for server %s' % self.name
+            return UNKNOWN, 'Could not find ORB metrics for server {}'.format(self.name)
         else:
             percentused = int(float(self.orbactive) / float(self.orbpoolsize) * 100)
-            msg = 'ORB Thread Pool: %s/%s (%s%%)' % (self.orbactive, self.orbpoolsize, percentused)
+            msg = 'ORB Thread Pool: {actv}/{sz} ({pc}%)|' \
+                  'orbthreadpoolusage={pc}%;{warn};{crit} orbthreadpoolused={actv};;;0;{sz}'\
+                .format(actv=self.orbactive, sz=self.orbpoolsize, pc=percentused, warn=warning, crit=critical)
             if warning < percentused < critical:
                 return WARNING, msg
             elif percentused >= critical:
@@ -207,94 +212,105 @@ class TypicalApplicationServer(GenericServer):
 
     def querydbconnpoolpercentused(self, jndiname=None, warning=75, critical=90):
         if len(self.connpoolspercentused) == 0 or self.connpoolspercentused is None:
-            return UNKNOWN, 'Could not find DB Connection Pool Percent Used metrics for server %s' % self.name
+            return UNKNOWN, 'Could not find DB Connection Pool Percent Used metrics for server {}'.format(self.name)
         else:
-            msg = 'DB Connection Pool Percent Used'
             statuscode = OK
             if jndiname is None:
                 # If no jndi name is given, show all Connection Pools
-                # alert if any is above Warn, Crit
+                # alert if ANY is above Warn, Crit
+                msg = 'DB Connection Pool Percent Used'
+                perfdata = '|'
                 for connpool in self.connpoolspercentused:
                     percentused = int(self.connpoolspercentused[connpool])
-                    msg += ' - %s %s%%' % (connpool, percentused)
+                    msg += ' - {connpool} {pc}%'.format(connpool=connpool, pc=percentused)
+                    perfdata += '{connpool}_usage={pc}%;{warn};{crit} '\
+                        .format(connpool=connpool, pc=percentused, warn=warning, crit=critical)
                     # For this loop, Change statuscode only when lower status code is active
                     # e.g. change to warning only when statuscode is OK, not critical or warning
                     if warning < percentused < critical and statuscode == OK:
                         statuscode = WARNING
                     if critical <= percentused:
                         statuscode = CRITICAL
+                msg += perfdata
             elif jndiname in self.connpoolspercentused:
                 percentused = int(self.connpoolspercentused[jndiname])
-                msg += ' - %s %s%%' % (jndiname, percentused)
+                msg = 'DB Connection Pool Percent Used - {jndi} {pc}%|{jndi}_usage={pc}%;{warn};{crit}'\
+                    .format(jndi=jndiname, pc=percentused, warn=warning, crit=critical)
                 if warning < percentused < critical:
                     statuscode = WARNING
                 if critical <= percentused:
                     statuscode = CRITICAL
             else:
-                msg = "No DB Connection Pool for " + jndiname + " was found"
+                msg = 'No DB Connection Pool for {jndi} was found'.format(jndi=jndiname)
                 statuscode = "UNKNOWN"
             return statuscode, msg
 
     def querydbconnpoolusetime(self, jndiname, warning=10, critical=30):
         if len(self.connpoolsusetime) == 0 or self.connpoolsusetime is None:
-            return UNKNOWN, 'Could not find DB Connection Pool Use Time metrics for server %s' % self.name
+            return UNKNOWN, 'Could not find DB Connection Pool Use Time metrics for server {}'.format(self.name)
         else:
             if jndiname in self.connpoolsusetime:
-                msg = 'DB Connection Pool Use Time'
                 statuscode = OK
                 usetime = int(self.connpoolsusetime[jndiname])
-                msg += ' - %s %s seconds' % (jndiname, usetime)
+                msg = 'DB Connection Pool Use Time - {jndi} {usets} seconds|' \
+                      '{jndi}_usetime={usets}s;{warn};{crit};0'\
+                    .format(jndi=jndiname, usets=usetime, warn=warning, crit=critical)
                 if warning < usetime < critical:
                     statuscode = WARNING
                 if critical <= usetime:
                     statuscode = CRITICAL
             else:
                 statuscode = "UNKNOWN"
-                msg = "No DB Connection Pool for " + jndiname + " was found"
+                msg = 'No DB Connection Pool for {jndi} was found'.format(jndi=jndiname)
             return statuscode, msg
 
     def querydbconnpoolwaittime(self, jndiname, warning=5, critical=10):
         if len(self.connpoolswaittime) == 0 or self.connpoolswaittime is None:
-            return UNKNOWN, 'Could not find DB Connection Pool Wait Time metrics for server %s' % self.name
+            return UNKNOWN, 'Could not find DB Connection Pool Wait Time metrics for server {}'.format(self.name)
         else:
             if jndiname in self.connpoolswaittime:
-                msg = 'DB Connection Pool Wait Time'
                 statuscode = OK
                 waittime = int(self.connpoolswaittime[jndiname])
-                msg += ' - %s %s seconds' % (jndiname, waittime)
+                msg = 'DB Connection Pool Wait Time - {jndi} {waitts} seconds|' \
+                      '{jndi}_waittime={waitts}s;{warn};{crit};0'\
+                    .format(jndi=jndiname, waitts=waittime, warn=warning, crit=critical)
                 if warning < waittime < critical:
                     statuscode = WARNING
                 if critical <= waittime:
                     statuscode = CRITICAL
             else:
                 statuscode = "UNKNOWN"
-                msg = "No DB Connection Pool for " + jndiname + " was found"
+                msg = 'No DB Connection Pool for {jndi} was found'.format(jndi=jndiname)
             return statuscode, msg
 
     def querydbconnpoolwaitingthreadcount(self, jndiname, warning=5, critical=10):
         if len(self.connpoolswaitingthreadcount) == 0 or self.connpoolswaitingthreadcount is None:
-            return UNKNOWN, 'Could not find DB Connection Pool Waiting Thread Count metrics for server %s' % self.name
+            return UNKNOWN, 'Could not find DB Connection Pool Waiting Threads Count metrics for server {}'\
+                .format(self.name)
         else:
             if jndiname in self.connpoolswaitingthreadcount:
-                msg = 'DB Connection Pool Waiting Thread Count'
                 statuscode = OK
                 waitingthreadcount = int(self.connpoolswaitingthreadcount[jndiname])
-                msg += ' - %s %s' % (jndiname, waitingthreadcount)
+                msg = 'DB Connection Pool Waiting Threads Count - {jndi} {waitthrcount}|' \
+                      '{jndi}_waitthreads={waitthrcount};{warn};{crit};0'\
+                    .format(jndi=jndiname, waitthrcount=waitingthreadcount, warn=warning, crit=critical)
                 if warning < waitingthreadcount < critical:
                     statuscode = WARNING
                 if critical <= waitingthreadcount:
                     statuscode = CRITICAL
             else:
                 statuscode = "UNKNOWN"
-                msg = "No DB Connection Pool for " + jndiname + " was found"
+                msg = 'No DB Connection Pool for {jndi} was found'.format(jndi=jndiname)
             return statuscode, msg
 
     def queryheapusage(self, warning=75, critical=90):
         if self.heapusedMB is None or self.maxheapMB is None:
-            return UNKNOWN, 'Could not find Heap Usage metrics for server %s' % self.name
+            return UNKNOWN, 'Could not find Heap Usage metrics for server {}'.format(self.name)
         else:
             percentused = int(float(self.heapusedMB) / float(self.maxheapMB) * 100)
-            msg = 'Heap Usage: %s/%s MB (%s%%)' % (self.heapusedMB, self.maxheapMB, percentused)
+            msg = 'Heap Usage: {heapused}/{maxheap} MB ({heappc}%)|' \
+                  'heapusage={heappc}%;{warn};{crit} usedheap={heapused}MB;;;0;{maxheap}'\
+                .format(heapused=self.heapusedMB, maxheap=self.maxheapMB, heappc=percentused, warn=warning, crit=critical)
             if warning < percentused < critical:
                 return WARNING, msg
             elif percentused >= critical:
@@ -304,10 +320,11 @@ class TypicalApplicationServer(GenericServer):
 
     def querysecauthen(self, warning=2, critical=5):
         if self.webSecAuthenTime is None:
-            return UNKNOWN, 'Could not find Web Authentication Time metrics for server %s' % self.name
+            return UNKNOWN, 'Could not find Web Authentication Time metrics for server {}'.format(self.name)
         else:
             websecauthentime = int(self.webSecAuthenTime)
-            msg = 'Web Authentication Time: %s seconds' % self.webSecAuthenTime
+            msg = 'Web Authentication Time: {wsecauthtime} seconds|websecauthentime={wsecauthtime}s;{warn};{crit}'\
+                .format(wsecauthtime=self.webSecAuthenTime, warn=warning, crit=critical)
             if warning < websecauthentime < critical:
                 return WARNING, msg
             elif websecauthentime >= critical:
@@ -317,10 +334,11 @@ class TypicalApplicationServer(GenericServer):
 
     def querysecauthor(self, warning=2, critical=5):
         if self.webSecAuthorTime is None:
-            return UNKNOWN, 'Could not find Web Authorization Time metrics for server %s' % self.name
+            return UNKNOWN, 'Could not find Web Authorization Time metrics for server {}'.format(self.name)
         else:
             websecauthortime = int(self.webSecAuthorTime)
-            msg = 'Web Authorization Time: %s seconds' % self.webSecAuthorTime
+            msg = 'Web Authorization Time: {wsecauthortime} seconds|websecauthortime={wsecauthortime}s;{warn};{crit}'\
+                .format(wsecauthortime=self.webSecAuthorTime, warn=warning, crit=critical)
             if warning < websecauthortime < critical:
                 return WARNING, msg
             elif websecauthortime >= critical:
@@ -330,24 +348,35 @@ class TypicalApplicationServer(GenericServer):
 
     def querylivesessions(self):
         if len(self.livesessions) == 0 or self.totallivesessions is None:
-            return UNKNOWN, 'Could not find Live Session metrics for server %s' % self.name
+            return UNKNOWN, 'Could not find Live Session metrics for server {}'.format(self.name)
         else:
-            msg = 'live sessions: total %s' % self.totallivesessions
+            msg = 'live sessions: total {totalsessions}'.format(totalsessions=self.totallivesessions)
+            perfdata = '|totallivesessions={totalsessions};;;0'.format(totalsessions=self.totallivesessions)
             for appmodule in self.livesessions:
-                msg += ' , %s %s' % (appmodule, str(self.livesessions[appmodule]))
+                msg += ' , {mod} {livesessions!s}'.format(mod=appmodule, livesessions=self.livesessions[appmodule])
+                perfdata += " '{mod}_sessions'={livesessions!s};;;0"\
+                    .format(mod=appmodule, livesessions=self.livesessions[appmodule])
+            msg += perfdata
             return OK, msg
 
     def querysibdestination(self, destname, waitingmsgcountwarn=10, waitingmsgcountcrit=100):
         if len(self.destinations) == 0 or self.destinations is None:
-            return UNKNOWN, 'Could not find Destination metrics for server %s' % self.name
+            return UNKNOWN, 'Could not find Destination metrics for server {}'.format(self.name)
         else:
             destination = self.destinations[destname]
-            msg = 'Destination:%s - Available Messages:%s , Messages Consumed:%s ' % (
-                destination.Name, destination.AvailableMessages, destination.TotalMessagesConsumed)
+            msg = 'Destination:{dname} - Available Messages:{davail} , Messages Consumed:{dtotalmsgcon} '\
+                .format(dname=destination.Name, davail=destination.AvailableMessages,
+                        dtotalmsgcon=destination.TotalMessagesConsumed)
             if isinstance(destination, SIBTopicSpace) and len(destination.subscribers) > 0:
                 msg += ' , Durable Subscribers:'
                 for subscriber in destination.subscribers:
                     msg += '%s ' % subscriber
+            msg += '|{dname}_AvailMsgs={davail};{warn};{crit};0 {dname}_ConsumMsgs={dtotalmsgcon};;;0'\
+                .format(dname=destination.Name,
+                        davail=destination.AvailableMessages,
+                        dtotalmsgcon=destination.TotalMessagesConsumed,
+                        warn=waitingmsgcountwarn,
+                        crit=waitingmsgcountcrit)
             if waitingmsgcountwarn < int(destination.AvailableMessages) < waitingmsgcountcrit:
                 return WARNING, msg
             elif int(destination.AvailableMessages) > waitingmsgcountcrit:
