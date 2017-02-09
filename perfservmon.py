@@ -166,6 +166,37 @@ class TypicalApplicationServer(GenericServer):
     def adddestination(self, sibdest):
         self.destinations[sibdest.Name] = sibdest
 
+    def querymetric(self, metric, warning, critical, destination=None, jndi=None):
+        """
+        Delegate the metric query to the appropriate function
+        :param metric:
+        :param warning:
+        :param critical:
+        :param destination:
+        :param jndi:
+        :return:
+        """
+        metrics = dict(WebContainer=self.querywebcontainer,
+                       WebContainerThreadHung=self.querywebcontainerhungthreads,
+                       ORB=self.queryorb,
+                       DBConnectionPoolPercentUsed=self.querydbconnpoolpercentused,
+                       DBConnectionPoolUseTime=self.querydbconnpoolusetime,
+                       DBConnectionPoolWaitTime=self.querydbconnpoolwaittime,
+                       DBConnectionPoolWaitingThreadCount=self.querydbconnpoolwaitingthreadcount,
+                       WebAuthenticationTime=self.querysecauthen,
+                       WebAuthorizationTime=self.querysecauthor,
+                       Heap=self.queryheapusage,
+                       LiveSessions=self.querylivesessions,
+                       SIBDestinations=self.querysibdestination
+                       )
+
+        queryargs = dict(warning=warning, critical=critical)
+        if destination is not None:
+            queryargs['destname'] = destination
+        elif jndi is not None:
+            queryargs['jndiname'] = jndi
+        return metrics[metric](**queryargs)
+
     def querywebcontainer(self, warning=75, critical=90):
         if self.wcactive is None or self.wcpoolsize is None:
             return UNKNOWN, 'Could not find WebContainer Usage metrics for server {}'.format(self.name)
@@ -245,9 +276,11 @@ class TypicalApplicationServer(GenericServer):
                 statuscode = "UNKNOWN"
             return statuscode, msg
 
-    def querydbconnpoolusetime(self, jndiname, warning=10, critical=30):
+    def querydbconnpoolusetime(self, jndiname=None, warning=10, critical=30):
         if len(self.connpoolsusetime) == 0 or self.connpoolsusetime is None:
             return UNKNOWN, 'Could not find DB Connection Pool Use Time metrics for server {}'.format(self.name)
+        elif jndiname is None:
+            return UNKNOWN, 'Please set datasource JNDI name using -j JndiName'
         else:
             if jndiname in self.connpoolsusetime:
                 statuscode = OK
@@ -264,9 +297,11 @@ class TypicalApplicationServer(GenericServer):
                 msg = 'No DB Connection Pool for {jndi} was found'.format(jndi=jndiname)
             return statuscode, msg
 
-    def querydbconnpoolwaittime(self, jndiname, warning=5, critical=10):
+    def querydbconnpoolwaittime(self, jndiname=None, warning=5, critical=10):
         if len(self.connpoolswaittime) == 0 or self.connpoolswaittime is None:
             return UNKNOWN, 'Could not find DB Connection Pool Wait Time metrics for server {}'.format(self.name)
+        elif jndiname is None:
+            return UNKNOWN, 'Please set datasource JNDI name using -j JndiName'
         else:
             if jndiname in self.connpoolswaittime:
                 statuscode = OK
@@ -283,10 +318,12 @@ class TypicalApplicationServer(GenericServer):
                 msg = 'No DB Connection Pool for {jndi} was found'.format(jndi=jndiname)
             return statuscode, msg
 
-    def querydbconnpoolwaitingthreadcount(self, jndiname, warning=5, critical=10):
+    def querydbconnpoolwaitingthreadcount(self, jndiname=None, warning=5, critical=10):
         if len(self.connpoolswaitingthreadcount) == 0 or self.connpoolswaitingthreadcount is None:
             return UNKNOWN, 'Could not find DB Connection Pool Waiting Threads Count metrics for server {}'\
                 .format(self.name)
+        elif jndiname is None:
+            return UNKNOWN, 'Please set datasource JNDI name using -j JndiName'
         else:
             if jndiname in self.connpoolswaitingthreadcount:
                 statuscode = OK
@@ -346,7 +383,8 @@ class TypicalApplicationServer(GenericServer):
             else:
                 return OK, msg
 
-    def querylivesessions(self):
+    def querylivesessions(self, warning=None, critical=None):
+        # TODO Implement threshold checking
         if len(self.livesessions) == 0 or self.totallivesessions is None:
             return UNKNOWN, 'Could not find Live Session metrics for server {}'.format(self.name)
         else:
@@ -359,9 +397,11 @@ class TypicalApplicationServer(GenericServer):
             msg += perfdata
             return OK, msg
 
-    def querysibdestination(self, destname, waitingmsgcountwarn=10, waitingmsgcountcrit=100):
+    def querysibdestination(self, destname=None, warning=10, critical=100):
         if len(self.destinations) == 0 or self.destinations is None:
             return UNKNOWN, 'Could not find Destination metrics for server {}'.format(self.name)
+        elif destname is None:
+            return UNKNOWN, 'Please set Destination name using -d DestName'
         else:
             destination = self.destinations[destname]
             msg = 'Destination:{dname} - Available Messages:{davail} , Messages Consumed:{dtotalmsgcon} '\
@@ -375,11 +415,11 @@ class TypicalApplicationServer(GenericServer):
                 .format(dname=destination.Name,
                         davail=destination.AvailableMessages,
                         dtotalmsgcon=destination.TotalMessagesConsumed,
-                        warn=waitingmsgcountwarn,
-                        crit=waitingmsgcountcrit)
-            if waitingmsgcountwarn < int(destination.AvailableMessages) < waitingmsgcountcrit:
+                        warn=warning,
+                        crit=critical)
+            if warning < int(destination.AvailableMessages) < critical:
                 return WARNING, msg
-            elif int(destination.AvailableMessages) > waitingmsgcountcrit:
+            elif int(destination.AvailableMessages) > critical:
                 return CRITICAL, msg
             else:
                 return OK, msg
@@ -575,9 +615,9 @@ def retrieveperfxml(path, cellname, ip, port, username, password, httpprotocol='
             # Pre Python 2.7.9 behaviour or plain http request
             perfserv = urllib2.urlopen(req, timeout=urlopentimeout)
     except urllib2.HTTPError as error:
-            return CRITICAL, 'Could not open perfservlet URL - Response Status Code %s' % error.code
+        return CRITICAL, 'Could not open perfservlet URL - Response Status Code {}'.format(error.code)
     except urllib2.URLError as error:
-        return CRITICAL, 'Could not open perfservlet URL - %s' % error.reason
+        return CRITICAL, 'Could not open perfservlet URL - {}'.format(error.reason)
     # Handle HTTP Timeouts
     except socket.timeout:
         return CRITICAL, 'Could not open perfservlet URL: Socket Timeout'
@@ -592,9 +632,9 @@ def retrieveperfxml(path, cellname, ip, port, username, password, httpprotocol='
         if root.attrib['responseStatus'] == 'failed':
             return CRITICAL, 'Error retrieving PMI data! Check your Cell status!'
         elif root.attrib['responseStatus'] == 'success':
-            return OK, 'PerfServlet Data refreshed on %s' % (datetime.datetime.now().strftime('%c'))
+            return OK, 'PerfServlet Data refreshed on {}'.format(datetime.datetime.now().strftime('%c'))
         else:
-            return UNKNOWN, 'Unknown Perfserv Status: %s' % root.attrib['responseStatus']
+            return UNKNOWN, 'Unknown Perfserv Status: {}'.format(root.attrib['responseStatus'])
 
 
 def touch(fullpath):
@@ -691,42 +731,7 @@ def queryperfdata(path, cellname, nodename, servername, metric, warning, critica
     serverfullname = '.'.join((nodename, servername))
     if serverfullname in perffile:
         appsrv = perffile[serverfullname]
-        if metric == 'WebContainer':
-            return appsrv.querywebcontainer(warning, critical)
-        if metric == 'WebContainerThreadHung':
-            return appsrv.querywebcontainerhungthreads(warning, critical)
-        elif metric == 'ORB':
-            return appsrv.queryorb(warning, critical)
-        elif metric == 'DBConnectionPoolPercentUsed':
-            return appsrv.querydbconnpoolpercentused(jndiname, warning, critical)
-        elif metric == 'DBConnectionPoolUseTime':
-            if jndiname is not None:
-                return appsrv.querydbconnpoolusetime(jndiname, warning, critical)
-            else:
-                return UNKNOWN, 'Please set datasource JNDI name using -j JndiName'
-        elif metric == 'DBConnectionPoolWaitTime':
-            if jndiname is not None:
-                return appsrv.querydbconnpoolwaittime(jndiname, warning, critical)
-            else:
-                return UNKNOWN, 'Please set datasource JNDI name using -j JndiName'
-        elif metric == 'DBConnectionPoolWaitingThreadCount':
-            if jndiname is not None:
-                return appsrv.querydbconnpoolwaitingthreadcount(jndiname, warning, critical)
-            else:
-                return UNKNOWN, 'Please set datasource JNDI name using -j JndiName'
-        elif metric == 'WebAuthenticationTime':
-            return appsrv.querysecauthen(warning, critical)
-        elif metric == 'WebAuthorizationTime':
-            return appsrv.querysecauthor(warning, critical)
-        elif metric == 'Heap':
-            return appsrv.queryheapusage(warning, critical)
-        elif metric == 'LiveSessions':
-            return appsrv.querylivesessions()
-        elif metric == 'SIBDestinations':
-            if destination is not None:
-                return appsrv.querysibdestination(destination, warning, critical)
-            else:
-                return UNKNOWN, 'Please set destination Name using -d DestName'
+        return appsrv.querymetric(metric, warning, critical, destination, jndiname)
     else:
         return UNKNOWN, 'Not available statistics for server ' + serverfullname
 
@@ -734,16 +739,16 @@ def queryperfdata(path, cellname, nodename, servername, metric, warning, critica
 def show(alertstatus, alertmessage):
     """Print Nagios Msg and exit with appropriate Return Code"""
     if alertstatus == OK:
-        print 'OK - %s' % alertmessage
+        print 'OK - {}'.format(alertmessage)
         sys.exit(OK)
     elif alertstatus == WARNING:
-        print 'WARNING - %s' % alertmessage
+        print 'WARNING - {}'.format(alertmessage)
         sys.exit(WARNING)
     elif alertstatus == CRITICAL:
-        print 'CRITICAL - %s' % alertmessage
+        print 'CRITICAL - {}'.format(alertmessage)
         sys.exit(CRITICAL)
     else:
-        print 'UNKNOWN - %s' % alertmessage
+        print 'UNKNOWN - {}'.format(alertmessage)
         sys.exit(UNKNOWN)
 
 
