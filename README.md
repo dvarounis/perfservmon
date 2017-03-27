@@ -1,4 +1,4 @@
-#perfservmon
+# Perfservmon
 
 [![Code Issues](https://www.quantifiedcode.com/api/v1/project/6029a3ce1c814915ae94f9841332b754/badge.svg)](https://www.quantifiedcode.com/app/project/6029a3ce1c814915ae94f9841332b754)
 
@@ -20,7 +20,7 @@ The plugin can monitor the following WAS metrics of a WebSphere Cell:
 - Live HTTP Sessions
 - JMS SIB Destination(Queue, Topic) Metrics
 
-##Prerequisites
+## Prerequisites
 
 1. **Perfservlet App**
     Install the PerfServletApp.ear in one WAS server of your WebSphere Cell.
@@ -29,7 +29,7 @@ The plugin can monitor the following WAS metrics of a WebSphere Cell:
 
 The plugin is tested to work with WAS version 8.5. Here's a [script to install perfServlet](https://docs.google.com/document/d/1Y83R0zgeb-ns1zIb_eCzB23ajzjmVphChCxOim56hjw/edit#bookmark=id.mgnntqet769o)
 
-##Setup
+## Setup
 
 1. Copy the `perfservmon.py` file in `$USER1$` path, which is the plugins path. You will propably find the value of this variable in Nagios `resource.cfg` file (usually this is a `libexec` directory).
 
@@ -61,7 +61,7 @@ define command{
         }
 ```
 
-##Usage
+## Usage
 
 #### Define Collector Service 
 Before defining a service using check_perfserv_show it is required to add the following service definition at the WAS Server or the DMgr Server(for ND Architecture) Nagios Config file:
