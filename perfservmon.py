@@ -52,18 +52,21 @@ class SIBDestination:
     Can be a Topic Space or a Queue
     """
 
-    def __init__(self, name, totalmessagesconsumed, availablemessages):
+    def __init__(self, name, mename, totalmessagesconsumed, availablemessages):
         """
         :param name: The Destination Name
+        :param mename: The Message Engine Name  
         :param totalmessagesconsumed: PMI Metric -> Total Messages Consumed since restart of Message Engine
         :param availablemessages: PMI Metric -> No of available msgs in Destination
         """
         self.Name = name
+        self.MEName = mename
         self.TotalMessagesConsumed = totalmessagesconsumed
         self.AvailableMessages = availablemessages
 
     def printsibdest(self):
         print 'SIB Destination Name:' + str(self.Name)
+        print 'SIB Message Engine Name:' + str(self.MEName)
         print 'SIB Dest Messages Consumed:' + str(self.TotalMessagesConsumed)
         print 'SIB Dest Available Messages:' + str(self.AvailableMessages)
 
@@ -71,20 +74,20 @@ class SIBDestination:
 class SIBQueue(SIBDestination):
     """Queue Destination"""
 
-    def __init__(self, name, totalmessagesconsumed, availablemessages):
-        SIBDestination.__init__(self, name, totalmessagesconsumed, availablemessages)
+    def __init__(self, name, mename, totalmessagesconsumed, availablemessages):
+        SIBDestination.__init__(self, name, mename, totalmessagesconsumed, availablemessages)
 
 
 class SIBTopicSpace(SIBDestination):
     """Pub/Sub Destination"""
 
-    def __init__(self, name, totalmessagesconsumed, availablemessages):
+    def __init__(self, name, mename, totalmessagesconsumed, availablemessages):
         """
         :param name: The Destination Name
         :param totalmessagesconsumed: PMI Metric -> Total Messages Consumed since restart of Message Engine
         :param availablemessages: PMI Metric -> No of available msgs in Destination
         """
-        SIBDestination.__init__(self, name, totalmessagesconsumed, availablemessages)
+        SIBDestination.__init__(self, name, mename, totalmessagesconsumed, availablemessages)
         self.subscribers = []
 
     def adddurablesubscriber(self, subscrname):
@@ -119,6 +122,7 @@ class TypicalApplicationServer(GenericServer):
         self.activesessions = {}
         self.livesessions = {}
         self.destinations = {}
+        self.messageengines = []
         self.webSecAuthenTime = None
         self.webSecAuthorTime = None
 
@@ -166,6 +170,10 @@ class TypicalApplicationServer(GenericServer):
     def adddestination(self, sibdest):
         self.destinations[sibdest.Name] = sibdest
 
+    def addsibme(self, sibmename):
+        self.messageengines.append(sibmename)
+        # TODO declare query sibme
+
     def querymetric(self, metric, warning, critical, destination=None, jndi=None):
         """
         Delegate the metric query to the appropriate function
@@ -203,7 +211,7 @@ class TypicalApplicationServer(GenericServer):
         else:
             percentused = int(float(self.wcactive) / float(self.wcpoolsize) * 100)
             msg = 'WebContainer Thread Pool: {actv}/{sz} ({pc}%)|' \
-                  'wcthreadpoolusage={pc}%;{warn};{crit} wcthreadpoolused={actv};;;0;{sz}'\
+                  'wcthreadpoolusage={pc}%;{warn};{crit} wcthreadpoolused={actv};;;0;{sz}' \
                 .format(actv=self.wcactive, sz=self.wcpoolsize, pc=percentused, warn=warning, crit=critical)
             if warning < percentused < critical:
                 return WARNING, msg
@@ -217,7 +225,7 @@ class TypicalApplicationServer(GenericServer):
             return UNKNOWN, 'Could not find WebContainer Thread Hung metrics for server {}'.format(self.name)
         else:
             wcthreadshung = int(self.wcthreadshung)
-            msg = 'WebContainer Declared Thread Hung: {thrh}|wcthreadhung={thrh};{warn};{crit};0'\
+            msg = 'WebContainer Declared Thread Hung: {thrh}|wcthreadhung={thrh};{warn};{crit};0' \
                 .format(thrh=self.wcthreadshung, warn=warning, crit=critical)
             if warning < wcthreadshung < critical:
                 return WARNING, msg
@@ -232,7 +240,7 @@ class TypicalApplicationServer(GenericServer):
         else:
             percentused = int(float(self.orbactive) / float(self.orbpoolsize) * 100)
             msg = 'ORB Thread Pool: {actv}/{sz} ({pc}%)|' \
-                  'orbthreadpoolusage={pc}%;{warn};{crit} orbthreadpoolused={actv};;;0;{sz}'\
+                  'orbthreadpoolusage={pc}%;{warn};{crit} orbthreadpoolused={actv};;;0;{sz}' \
                 .format(actv=self.orbactive, sz=self.orbpoolsize, pc=percentused, warn=warning, crit=critical)
             if warning < percentused < critical:
                 return WARNING, msg
@@ -254,7 +262,7 @@ class TypicalApplicationServer(GenericServer):
                 for connpool in self.connpoolspercentused:
                     percentused = int(self.connpoolspercentused[connpool])
                     msg += ' - {connpool} {pc}%'.format(connpool=connpool, pc=percentused)
-                    perfdata += '{connpool}_usage={pc}%;{warn};{crit} '\
+                    perfdata += '{connpool}_usage={pc}%;{warn};{crit} ' \
                         .format(connpool=connpool, pc=percentused, warn=warning, crit=critical)
                     # For this loop, Change statuscode only when lower status code is active
                     # e.g. change to warning only when statuscode is OK, not critical or warning
@@ -265,7 +273,7 @@ class TypicalApplicationServer(GenericServer):
                 msg += perfdata
             elif jndiname in self.connpoolspercentused:
                 percentused = int(self.connpoolspercentused[jndiname])
-                msg = 'DB Connection Pool Percent Used - {jndi} {pc}%|{jndi}_usage={pc}%;{warn};{crit}'\
+                msg = 'DB Connection Pool Percent Used - {jndi} {pc}%|{jndi}_usage={pc}%;{warn};{crit}' \
                     .format(jndi=jndiname, pc=percentused, warn=warning, crit=critical)
                 if warning < percentused < critical:
                     statuscode = WARNING
@@ -286,7 +294,7 @@ class TypicalApplicationServer(GenericServer):
                 statuscode = OK
                 usetime = int(self.connpoolsusetime[jndiname])
                 msg = 'DB Connection Pool Use Time - {jndi} {usets} seconds|' \
-                      '{jndi}_usetime={usets}s;{warn};{crit};0'\
+                      '{jndi}_usetime={usets}s;{warn};{crit};0' \
                     .format(jndi=jndiname, usets=usetime, warn=warning, crit=critical)
                 if warning < usetime < critical:
                     statuscode = WARNING
@@ -307,7 +315,7 @@ class TypicalApplicationServer(GenericServer):
                 statuscode = OK
                 waittime = int(self.connpoolswaittime[jndiname])
                 msg = 'DB Connection Pool Wait Time - {jndi} {waitts} seconds|' \
-                      '{jndi}_waittime={waitts}s;{warn};{crit};0'\
+                      '{jndi}_waittime={waitts}s;{warn};{crit};0' \
                     .format(jndi=jndiname, waitts=waittime, warn=warning, crit=critical)
                 if warning < waittime < critical:
                     statuscode = WARNING
@@ -320,7 +328,7 @@ class TypicalApplicationServer(GenericServer):
 
     def querydbconnpoolwaitingthreadcount(self, jndiname=None, warning=5, critical=10):
         if len(self.connpoolswaitingthreadcount) == 0 or self.connpoolswaitingthreadcount is None:
-            return UNKNOWN, 'Could not find DB Connection Pool Waiting Threads Count metrics for server {}'\
+            return UNKNOWN, 'Could not find DB Connection Pool Waiting Threads Count metrics for server {}' \
                 .format(self.name)
         elif jndiname is None:
             return UNKNOWN, 'Please set datasource JNDI name using -j JndiName'
@@ -329,7 +337,7 @@ class TypicalApplicationServer(GenericServer):
                 statuscode = OK
                 waitingthreadcount = int(self.connpoolswaitingthreadcount[jndiname])
                 msg = 'DB Connection Pool Waiting Threads Count - {jndi} {waitthrcount}|' \
-                      '{jndi}_waitthreads={waitthrcount};{warn};{crit};0'\
+                      '{jndi}_waitthreads={waitthrcount};{warn};{crit};0' \
                     .format(jndi=jndiname, waitthrcount=waitingthreadcount, warn=warning, crit=critical)
                 if warning < waitingthreadcount < critical:
                     statuscode = WARNING
@@ -346,8 +354,9 @@ class TypicalApplicationServer(GenericServer):
         else:
             percentused = int(float(self.heapusedMB) / float(self.maxheapMB) * 100)
             msg = 'Heap Usage: {heapused}/{maxheap} MB ({heappc}%)|' \
-                  'heapusage={heappc}%;{warn};{crit} usedheap={heapused}MB;;;0;{maxheap}'\
-                .format(heapused=self.heapusedMB, maxheap=self.maxheapMB, heappc=percentused, warn=warning, crit=critical)
+                  'heapusage={heappc}%;{warn};{crit} usedheap={heapused}MB;;;0;{maxheap}' \
+                .format(heapused=self.heapusedMB, maxheap=self.maxheapMB, heappc=percentused, warn=warning,
+                        crit=critical)
             if warning < percentused < critical:
                 return WARNING, msg
             elif percentused >= critical:
@@ -360,7 +369,7 @@ class TypicalApplicationServer(GenericServer):
             return UNKNOWN, 'Could not find Web Authentication Time metrics for server {}'.format(self.name)
         else:
             websecauthentime = int(self.webSecAuthenTime)
-            msg = 'Web Authentication Time: {wsecauthtime} seconds|websecauthentime={wsecauthtime}s;{warn};{crit}'\
+            msg = 'Web Authentication Time: {wsecauthtime} seconds|websecauthentime={wsecauthtime}s;{warn};{crit}' \
                 .format(wsecauthtime=self.webSecAuthenTime, warn=warning, crit=critical)
             if warning < websecauthentime < critical:
                 return WARNING, msg
@@ -374,7 +383,7 @@ class TypicalApplicationServer(GenericServer):
             return UNKNOWN, 'Could not find Web Authorization Time metrics for server {}'.format(self.name)
         else:
             websecauthortime = int(self.webSecAuthorTime)
-            msg = 'Web Authorization Time: {wsecauthortime} seconds|websecauthortime={wsecauthortime}s;{warn};{crit}'\
+            msg = 'Web Authorization Time: {wsecauthortime} seconds|websecauthortime={wsecauthortime}s;{warn};{crit}' \
                 .format(wsecauthortime=self.webSecAuthorTime, warn=warning, crit=critical)
             if warning < websecauthortime < critical:
                 return WARNING, msg
@@ -392,26 +401,29 @@ class TypicalApplicationServer(GenericServer):
             perfdata = '|totallivesessions={totalsessions};;;0'.format(totalsessions=self.totallivesessions)
             for appmodule in self.livesessions:
                 msg += ' , {mod} {livesessions!s}'.format(mod=appmodule, livesessions=self.livesessions[appmodule])
-                perfdata += " '{mod}_sessions'={livesessions!s};;;0"\
+                perfdata += " '{mod}_sessions'={livesessions!s};;;0" \
                     .format(mod=appmodule, livesessions=self.livesessions[appmodule])
             msg += perfdata
             return OK, msg
 
     def querysibdestination(self, destname=None, warning=10, critical=100):
         if len(self.destinations) == 0 or self.destinations is None:
-            return UNKNOWN, 'Could not find Destination metrics for server {}'.format(self.name)
+            if len(self.messageengines) > 0:
+                return OK, 'Inactive SIB Message Engine'
+            else:
+                return UNKNOWN, 'Could not find requested Destination metrics for server {}'.format(self.name)
         elif destname is None:
             return UNKNOWN, 'Please set Destination name using -d DestName'
         else:
             destination = self.destinations[destname]
-            msg = 'Destination:{dname} - Available Messages:{davail} , Messages Consumed:{dtotalmsgcon} '\
+            msg = 'Destination:{dname} - Available Messages:{davail} , Messages Consumed:{dtotalmsgcon} ' \
                 .format(dname=destination.Name, davail=destination.AvailableMessages,
                         dtotalmsgcon=destination.TotalMessagesConsumed)
             if isinstance(destination, SIBTopicSpace) and len(destination.subscribers) > 0:
                 msg += ' , Durable Subscribers:'
                 for subscriber in destination.subscribers:
                     msg += '%s ' % subscriber
-            msg += '|{dname}_AvailMsgs={davail};{warn};{crit};0 {dname}_ConsumMsgs={dtotalmsgcon};;;0'\
+            msg += '|{dname}_AvailMsgs={davail};{warn};{crit};0 {dname}_ConsumMsgs={dtotalmsgcon};;;0' \
                 .format(dname=destination.Name,
                         davail=destination.AvailableMessages,
                         dtotalmsgcon=destination.TotalMessagesConsumed,
@@ -458,7 +470,7 @@ def parseperfxml(path, cellname):
                         # For each metric call the appropriate method
                         metrics[metricname](was, stat)
                 # Comment out for debug purposes
-                #was.printserver()
+                # was.printserver()
                 pfile[was.serverfullname()] = was
     except AttributeError:
         raise
@@ -511,22 +523,23 @@ def parseconnpoolsstats(was, stat):
                 was.addjdbcconnpoolpercentused(connpool.attrib['name'], connpoolpercentused.attrib['value'])
             connpoolwaitingthreadcount = connpool.find(".//RangeStatistic[@name='WaitingThreadCount']")
             if connpoolwaitingthreadcount is not None:
-                was.addjdbcconnpoolwaitingthreadcount(connpool.attrib['name'], connpoolwaitingthreadcount.attrib['value'])
+                was.addjdbcconnpoolwaitingthreadcount(connpool.attrib['name'],
+                                                      connpoolwaitingthreadcount.attrib['value'])
             # The following values are measured in ms, convert to seconds
             connpoolusetime = connpool.find(".//TimeStatistic[@name='UseTime']")
             if connpoolusetime is not None:
-                was.addjdbcconnpoolusetime(connpool.attrib['name'], int(connpoolusetime.attrib['max'])/1000)
+                was.addjdbcconnpoolusetime(connpool.attrib['name'], int(connpoolusetime.attrib['max']) / 1000)
             connpoolwaittime = connpool.find(".//TimeStatistic[@name='WaitTime']")
             if connpoolwaittime is not None:
-                was.addjdbcconnpoolwaittime(connpool.attrib['name'], int(connpoolwaittime.attrib['max'])/1000)
+                was.addjdbcconnpoolwaittime(connpool.attrib['name'], int(connpoolwaittime.attrib['max']) / 1000)
 
 
 def parsesessionstats(was, stat):
-    for module in stat.findall('./Stat'):
-        modname = module.attrib['name']
+    for modul in stat.findall('./Stat'):
+        modname = modul.attrib['name']
         if not modname.startswith('perfServletApp'):
-            activesessions = module.find(".//RangeStatistic[@name='ActiveCount']")
-            livesessions = module.find(".//RangeStatistic[@name='LiveCount']")
+            activesessions = modul.find(".//RangeStatistic[@name='ActiveCount']")
+            livesessions = modul.find(".//RangeStatistic[@name='LiveCount']")
             if activesessions is not None:
                 was.addactivehttpsessions(modname, activesessions.attrib['value'])
             if livesessions is not None:
@@ -544,36 +557,45 @@ def parsesibstats(was, stat):
     :param was: Current Typical Application Server instance
     :param stat: Stat tags in perfservlet xml under the specific Server tag
     """
-    queuesnode = stat.find(".//Stat[@name='Queues']")
-    if queuesnode is not None:
-        for queue in queuesnode.findall('./Stat'):
-            queuename = queue.attrib['name']
-            totammsgsconsumed = queue.find(
-                "./CountStatistic[@name='QueueStats.TotalMessagesConsumedCount']")
-            availablemsgs = queue.find("./CountStatistic[@name='QueueStats.AvailableMessageCount']")
-            if totammsgsconsumed is not None and availablemsgs is not None:
-                sibqueue = SIBQueue(queuename, totammsgsconsumed.attrib['count'],
-                                    availablemsgs.attrib['count'])
-                was.adddestination(sibqueue)
-    topicspacesnode = stat.find(".//Stat[@name='Topicspaces']")
-    if topicspacesnode is not None:
-        # Loop over each topic space
-        for topicspace in topicspacesnode.findall('./Stat'):
-            topicspname = topicspace.attrib['name']
-            totammsgsconsumed = topicspace.find(
-                "./Stat/CountStatistic[@name='DurableSubscriptionStats.TotalMessagesConsumedCount']")
-            availablemsgs = topicspace.find(
-                "./Stat/CountStatistic[@name='DurableSubscriptionStats.AvailableMessageCount']")
-            if totammsgsconsumed is not None and availablemsgs is not None:
-                sibtopic = SIBTopicSpace(topicspname, totammsgsconsumed.attrib['count'],
-                                         availablemsgs.attrib['count'])
-                for durablesub in topicspace.findall("./Stat[@name='Durable Subscriptions']/Stat"):
-                    dursubname = durablesub.attrib['name']
-                    sibtopic.adddurablesubscriber(dursubname)
-                was.adddestination(sibtopic)
+    sibmes = stat.find(".//Stat[@name='SIB Messaging Engines']")
+    sibme = sibmes.findall('./Stat')
+    # Assume 1-to-1 relationship of ME and WAS JVM
+    if len(sibme) > 0:
+        sibmename = sibme[0].attrib['name']
+
+        queuesnode = stat.find(".//Stat[@name='Queues']")
+        if queuesnode is not None:
+            for queue in queuesnode.findall('./Stat'):
+                queuename = queue.attrib['name']
+                totammsgsconsumed = queue.find(
+                    "./CountStatistic[@name='QueueStats.TotalMessagesConsumedCount']")
+                availablemsgs = queue.find("./CountStatistic[@name='QueueStats.AvailableMessageCount']")
+                if totammsgsconsumed is not None and availablemsgs is not None:
+                    sibqueue = SIBQueue(queuename, sibmename, totammsgsconsumed.attrib['count'],
+                                        availablemsgs.attrib['count'])
+                    was.adddestination(sibqueue)
+        topicspacesnode = stat.find(".//Stat[@name='Topicspaces']")
+        if topicspacesnode is not None:
+            # Loop over each topic space
+            for topicspace in topicspacesnode.findall('./Stat'):
+                topicspname = topicspace.attrib['name']
+                totammsgsconsumed = topicspace.find(
+                    "./Stat/CountStatistic[@name='DurableSubscriptionStats.TotalMessagesConsumedCount']")
+                availablemsgs = topicspace.find(
+                    "./Stat/CountStatistic[@name='DurableSubscriptionStats.AvailableMessageCount']")
+                if totammsgsconsumed is not None and availablemsgs is not None:
+                    sibtopic = SIBTopicSpace(topicspname, sibmename, totammsgsconsumed.attrib['count'],
+                                             availablemsgs.attrib['count'])
+                    for durablesub in topicspace.findall("./Stat[@name='Durable Subscriptions']/Stat"):
+                        dursubname = durablesub.attrib['name']
+                        sibtopic.adddurablesubscriber(dursubname)
+                    was.adddestination(sibtopic)
+        # Case of inactive SIB Message Engine
+        if queuesnode is None and topicspacesnode is None:
+            was.addsibme(sibmename)
 
 
-# #################################################################################################################
+# #################################################################################################################\
 def retrieveperfxml(path, cellname, ip, port, username, password, httpprotocol='http', ignorecert=False):
     """
     Perfservlet XML Retrieval Method
