@@ -172,7 +172,6 @@ class TypicalApplicationServer(GenericServer):
 
     def addsibme(self, sibmename):
         self.messageengines.append(sibmename)
-        # TODO declare query sibme
 
     def querymetric(self, metric, warning, critical, destination=None, jndi=None):
         """
