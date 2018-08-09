@@ -484,21 +484,21 @@ def parseperfxml(path, cellname):
 def parsejvmstats(was, stat):
     for jvmstat in stat.iter():
         if jvmstat.attrib['name'] == 'HeapSize':
-            was.maxheapMB = int(jvmstat.attrib['upperBound']) / 1024
+            was.maxheapMB = int(jvmstat.attrib['upperBound']) // 1024
         if jvmstat.attrib['name'] == 'UsedMemory':
-            was.heapusedMB = int(jvmstat.attrib['count']) / 1024
+            was.heapusedMB = int(jvmstat.attrib['count']) // 1024
 
 
 def parsesecauthen(was, stat):
     for secauthen in stat.iter():
         if secauthen.attrib['name'] == 'WebAuthenticationTime':
-            was.webSecAuthenTime = int(secauthen.attrib['max']) / 1000
+            was.webSecAuthenTime = int(secauthen.attrib['max']) // 1000
 
 
 def parsesecauthor(was, stat):
     for secauthor in stat.iter():
         if secauthor.attrib['name'] == 'WebAuthorizationTime':
-            was.webSecAuthorTime = int(secauthor.attrib['max']) / 1000
+            was.webSecAuthorTime = int(secauthor.attrib['max']) // 1000
 
 
 def parsewebcontstats(was, stat):
@@ -533,10 +533,10 @@ def parseconnpoolsstats(was, stat):
             # The following values are measured in ms, convert to seconds
             connpoolusetime = connpool.find(".//TimeStatistic[@name='UseTime']")
             if connpoolusetime is not None:
-                was.addjdbcconnpoolusetime(connpool.attrib['name'], int(connpoolusetime.attrib['max']) / 1000)
+                was.addjdbcconnpoolusetime(connpool.attrib['name'], int(connpoolusetime.attrib['max']) // 1000)
             connpoolwaittime = connpool.find(".//TimeStatistic[@name='WaitTime']")
             if connpoolwaittime is not None:
-                was.addjdbcconnpoolwaittime(connpool.attrib['name'], int(connpoolwaittime.attrib['max']) / 1000)
+                was.addjdbcconnpoolwaittime(connpool.attrib['name'], int(connpoolwaittime.attrib['max']) // 1000)
 
 
 def parsesessionstats(was, stat):
