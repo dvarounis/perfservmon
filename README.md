@@ -26,7 +26,7 @@ The plugin can monitor the following WAS metrics of a WebSphere Cell:
     This is located in `<WAS_ROOT>/installableApps`, i.e. this would be in `/opt/IBM/WebSphere/AppServer/installableApps` in a Unix System.
 2. **Python version 2.7 or version 3.X** installed at the Nagios host
 
-The plugin is tested to work with WAS version 8.5. 
+The plugin is tested to work with WAS Traditional version 8.5 and 9.0. 
 
 ## Setup
 
