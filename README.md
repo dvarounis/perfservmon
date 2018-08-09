@@ -1,9 +1,7 @@
 # Perfservmon
 
-[![Code Issues](https://www.quantifiedcode.com/api/v1/project/6029a3ce1c814915ae94f9841332b754/badge.svg)](https://www.quantifiedcode.com/app/project/6029a3ce1c814915ae94f9841332b754)
-
 *Perfservmon* is  a *Nagios Plugin* for *IBM Websphere Application Server(WAS)* using the perfservlet web application that comes with each WAS 
-installation.
+installation. It also has **minimal library dependencies** so it can be easily used on most environments.
 
 The plugin can monitor the following WAS metrics of a WebSphere Cell:
 
@@ -20,14 +18,15 @@ The plugin can monitor the following WAS metrics of a WebSphere Cell:
 - Live HTTP Sessions
 - JMS SIB Destination(Queue, Topic) Metrics
 
+
 ## Prerequisites
 
 1. **Perfservlet App**
     Install the PerfServletApp.ear in one WAS server of your WebSphere Cell.
     This is located in `<WAS_ROOT>/installableApps`, i.e. this would be in `/opt/IBM/WebSphere/AppServer/installableApps` in a Unix System.
-2. **Python version 2.7** installed at the Nagios host
+2. **Python version 2.7 or version 3.X** installed at the Nagios host
 
-The plugin is tested to work with WAS version 8.5. Here's a [script to install perfServlet](https://docs.google.com/document/d/1Y83R0zgeb-ns1zIb_eCzB23ajzjmVphChCxOim56hjw/edit#bookmark=id.mgnntqet769o)
+The plugin is tested to work with WAS version 8.5. 
 
 ## Setup
 

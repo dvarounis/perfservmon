@@ -6,9 +6,15 @@
 
 import argparse
 import shelve
-import anydbm
 from xml.etree.ElementTree import parse
-import urllib2
+try:
+    from urllib.parse import urlparse, urlencode
+    from urllib.request import urlopen, Request
+    from urllib.error import HTTPError, URLError
+except ImportError:
+    from urlparse import urlparse
+    from urllib import urlencode
+    from urllib2 import urlopen, Request, HTTPError, URLError
 import sys
 import datetime
 import platform
@@ -36,10 +42,10 @@ class GenericServer:
         """
         Print Generic Server Attributes(for debug purposes)
         """
-        print 'Name:' + str(self.name)
-        print 'NodeName:' + str(self.nodename)
-        print 'MaxHeap:' + str(self.maxheapMB)
-        print 'HeapUsed:' + str(self.heapusedMB)
+        print('Name:' + str(self.name))
+        print('NodeName:' + str(self.nodename))
+        print('MaxHeap:' + str(self.maxheapMB))
+        print('HeapUsed:' + str(self.heapusedMB))
 
     def serverfullname(self):
         """Utility to uniquely identify a server in a Cell"""
@@ -65,10 +71,10 @@ class SIBDestination:
         self.AvailableMessages = availablemessages
 
     def printsibdest(self):
-        print 'SIB Destination Name:' + str(self.Name)
-        print 'SIB Message Engine Name:' + str(self.MEName)
-        print 'SIB Dest Messages Consumed:' + str(self.TotalMessagesConsumed)
-        print 'SIB Dest Available Messages:' + str(self.AvailableMessages)
+        print('SIB Destination Name:' + str(self.Name))
+        print('SIB Message Engine Name:' + str(self.MEName))
+        print('SIB Dest Messages Consumed:' + str(self.TotalMessagesConsumed))
+        print('SIB Dest Available Messages:' + str(self.AvailableMessages))
 
 
 class SIBQueue(SIBDestination):
@@ -97,7 +103,7 @@ class SIBTopicSpace(SIBDestination):
     def printsibdest(self):
         SIBDestination.printsibdest(self)
         if len(self.subscribers) > 0:
-            print 'SIB Topic Subscribers:' + str(self.subscribers)
+            print('SIB Topic Subscribers:' + str(self.subscribers))
 
 
 # ######################################################################################
@@ -130,24 +136,24 @@ class TypicalApplicationServer(GenericServer):
         """
         Print Typical Server Attributes(for debug purposes)
         """
-        print '****************************'
+        print('****************************')
         GenericServer.printserver(self)
-        print 'WebContainerActive:' + str(self.wcactive)
-        print 'WebContainerPoolSize:' + str(self.wcpoolsize)
-        print 'WebContainerConcurrentHungThreadCount:' + str(self.wcthreadshung)
-        print 'ORBActive:' + str(self.orbactive)
-        print 'ORBPoolSize:' + str(self.orbpoolsize)
-        print 'JDBC Conn Pools Percent Used:' + str(self.connpoolspercentused)
-        print 'JDBC Conn Pools Use Time:' + str(self.connpoolsusetime)
-        print 'JDBC Conn Pools Wait Time:' + str(self.connpoolswaittime)
-        print 'JDBC Conn Pools Waiting Thread Count:' + str(self.connpoolswaitingthreadcount)
-        print 'Total Active Http Sessions:' + str(self.totalactivesessions)
-        print 'Total Live Http Sessions:' + str(self.totallivesessions)
-        print 'Http Active Sessions:' + str(self.activesessions)
-        print 'Http Live Sessions:' + str(self.livesessions)
+        print('WebContainerActive:' + str(self.wcactive))
+        print('WebContainerPoolSize:' + str(self.wcpoolsize))
+        print('WebContainerConcurrentHungThreadCount:' + str(self.wcthreadshung))
+        print('ORBActive:' + str(self.orbactive))
+        print('ORBPoolSize:' + str(self.orbpoolsize))
+        print('JDBC Conn Pools Percent Used:' + str(self.connpoolspercentused))
+        print('JDBC Conn Pools Use Time:' + str(self.connpoolsusetime))
+        print('JDBC Conn Pools Wait Time:' + str(self.connpoolswaittime))
+        print('JDBC Conn Pools Waiting Thread Count:' + str(self.connpoolswaitingthreadcount))
+        print('Total Active Http Sessions:' + str(self.totalactivesessions))
+        print('Total Live Http Sessions:' + str(self.totallivesessions))
+        print('Http Active Sessions:' + str(self.activesessions))
+        print('Http Live Sessions:' + str(self.livesessions))
         for dest in self.destinations:
             (self.destinations[dest]).printsibdest()
-        print '****************************'
+        print('****************************')
 
     def addjdbcconnpoolpercentused(self, name, value):
         self.connpoolspercentused[name] = value
@@ -615,29 +621,30 @@ def retrieveperfxml(path, cellname, ip, port, username, password, httpprotocol='
         return UNKNOWN, 'Invalid Perfserv URL'
     xmlfilename = path + cellname + '.xml'
     try:
-        req = urllib2.Request(url)
+        req = Request(url)
         # if Basic Auth is enabled
         if username and password:
-            auth_encoded = base64.encodestring('%s:%s' % (username, password))[:-1]
-            req.add_header('Authorization', 'Basic %s' % auth_encoded)
+            credentials = ('%s:%s' % (username, password))
+            auth_encoded = base64.b64encode(credentials.encode('ascii'))
+            req.add_header('Authorization', 'Basic %s' % auth_encoded.decode("ascii"))
 
         # Add SSLContext check for Python newer than 2.7.9
         if httpprotocol == 'https' and hasattr(ssl, 'SSLContext') and hasattr(ssl, 'Purpose') and ignorecert is False:
             ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
             # Default Behaviour: Accept only trusted SSL certificates
-            perfserv = urllib2.urlopen(req, context=ctx, timeout=urlopentimeout)
+            perfserv = urlopen(req, context=ctx, timeout=urlopentimeout)
         elif httpprotocol == 'https' and hasattr(ssl, 'SSLContext') and ignorecert is True:
             # On --ignorecert option accept any certificate
             ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
-            perfserv = urllib2.urlopen(req, context=ctx, timeout=urlopentimeout)
+            perfserv = urlopen(req, context=ctx, timeout=urlopentimeout)
         else:
             # Pre Python 2.7.9 behaviour or plain http request
-            perfserv = urllib2.urlopen(req, timeout=urlopentimeout)
-    except urllib2.HTTPError as error:
+            perfserv = urlopen(req, timeout=urlopentimeout)
+    except HTTPError as error:
         return CRITICAL, 'Could not open perfservlet URL - Response Status Code {}'.format(error.code)
-    except urllib2.URLError as error:
+    except URLError as error:
         return CRITICAL, 'Could not open perfservlet URL - {}'.format(error.reason)
     # Handle HTTP Timeouts
     except socket.timeout:
@@ -646,7 +653,7 @@ def retrieveperfxml(path, cellname, ip, port, username, password, httpprotocol='
     except ssl.SSLError:
         return CRITICAL, 'Could not open perfservlet URL: Generic SSL Error, possibly a timeout'
     else:
-        with open(xmlfilename, 'w') as xmlfile:
+        with open(xmlfilename, 'wb') as xmlfile:
             xmlfile.writelines(perfserv.readlines())
         tree = parse(xmlfilename)
         root = tree.getroot()
@@ -747,8 +754,8 @@ def queryperfdata(path, cellname, nodename, servername, metric, warning, critica
         perffile = shelve.open(shelvefilename, flag='r')
     except IOError as error:
         return UNKNOWN, error.message
-    except anydbm.error as error:
-        return UNKNOWN, error.message
+    except:
+        return UNKNOWN, 'Error opening cached metrics file'
     serverfullname = '.'.join((nodename, servername))
     if serverfullname in perffile:
         appsrv = perffile[serverfullname]
@@ -760,16 +767,16 @@ def queryperfdata(path, cellname, nodename, servername, metric, warning, critica
 def show(alertstatus, alertmessage):
     """Print Nagios Msg and exit with appropriate Return Code"""
     if alertstatus == OK:
-        print 'OK - {}'.format(alertmessage)
+        print('OK - {}'.format(alertmessage))
         sys.exit(OK)
     elif alertstatus == WARNING:
-        print 'WARNING - {}'.format(alertmessage)
+        print('WARNING - {}'.format(alertmessage))
         sys.exit(WARNING)
     elif alertstatus == CRITICAL:
-        print 'CRITICAL - {}'.format(alertmessage)
+        print('CRITICAL - {}'.format(alertmessage))
         sys.exit(CRITICAL)
     else:
-        print 'UNKNOWN - {}'.format(alertmessage)
+        print('UNKNOWN - {}'.format(alertmessage))
         sys.exit(UNKNOWN)
 
 
