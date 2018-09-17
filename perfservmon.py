@@ -453,7 +453,6 @@ def parseperfxml(path, cellname):
     """
     xmlfilename = path + cellname + '.xml'
     shelvefilename = path + cellname + '.dbm'
-    pfile = shelve.open(shelvefilename, flag='c')
     metrics = {'Security Authentication': parsesecauthen,
                'Security Authorization': parsesecauthor,
                'JVM Runtime': parsejvmstats,
@@ -463,22 +462,24 @@ def parseperfxml(path, cellname):
                'Servlet Session Manager': parsesessionstats,
                'SIB Service': parsesibstats
                }
-    try:
-        tree = parse(xmlfilename)
-        for B in tree.iter('Node'):
-            nodename = B.attrib['name']
-            for server in B.iter('Server'):
-                was = TypicalApplicationServer(server.attrib['name'], nodename)
-                for stat in server.iter('Stat'):
-                    metricname = stat.attrib['name']
-                    if metricname is not None and metricname in metrics:
-                        # For each metric call the appropriate method
-                        metrics[metricname](was, stat)
-                # Comment out for debug purposes
-                # was.printserver()
-                pfile[was.serverfullname()] = was
-    except AttributeError:
-        raise
+
+    with shelve.open(shelvefilename, flag='c') as pfile:
+        try:
+            tree = parse(xmlfilename)
+            for B in tree.iter('Node'):
+                nodename = B.attrib['name']
+                for server in B.iter('Server'):
+                    was = TypicalApplicationServer(server.attrib['name'], nodename)
+                    for stat in server.iter('Stat'):
+                        metricname = stat.attrib['name']
+                        if metricname is not None and metricname in metrics:
+                            # For each metric call the appropriate method
+                            metrics[metricname](was, stat)
+                    # Comment out for debug purposes
+                    # was.printserver()
+                    pfile[was.serverfullname()] = was
+        except AttributeError:
+            raise
 
 
 def parsejvmstats(was, stat):
@@ -751,17 +752,17 @@ def queryperfdata(path, cellname, nodename, servername, metric, warning, critica
     """
     shelvefilename = path + cellname + '.dbm'
     try:
-        perffile = shelve.open(shelvefilename, flag='r')
+        with shelve.open(shelvefilename, flag='r') as perffile:
+            serverfullname = '.'.join((nodename, servername))
+            if serverfullname in perffile:
+                appsrv = perffile[serverfullname]
+                return appsrv.querymetric(metric, warning, critical, destination, jndiname)
+            else:
+                return UNKNOWN, 'Not available statistics for server ' + serverfullname
     except IOError as error:
         return UNKNOWN, error.message
     except:
         return UNKNOWN, 'Error opening cached metrics file'
-    serverfullname = '.'.join((nodename, servername))
-    if serverfullname in perffile:
-        appsrv = perffile[serverfullname]
-        return appsrv.querymetric(metric, warning, critical, destination, jndiname)
-    else:
-        return UNKNOWN, 'Not available statistics for server ' + serverfullname
 
 
 def show(alertstatus, alertmessage):
